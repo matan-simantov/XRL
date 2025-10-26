@@ -1,0 +1,214 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Soft palette tokens */
+    --bg: #F7F8FB;
+    --surface: #FFFFFF;
+    --text: #1F2430;
+    --muted-text: #6B7280;
+    --border-hex: #E8EAF0;
+
+    --primary-hex: #7A6FF0;
+    --primary-strong-hex: #5E54E8;
+    --primary-ghost-hex: #ECEBFF;
+    --primary-chip-hex: #E6E4FF;
+    --background: 248 30% 98%;
+    --foreground: 0 0% 13%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 13%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 13%;
+
+    --primary: 252 71% 72%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 248 20% 96%;
+    --secondary-foreground: 0 0% 13%;
+
+    --muted: 248 20% 96%;
+    --muted-foreground: 0 0% 40%;
+
+    --accent: 250 65% 68%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 258 90% 66%;
+
+    --radius: 1rem;
+    
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.05);
+
+    --sidebar-background: 0 0% 100%;
+
+    --sidebar-foreground: 0 0% 13%;
+
+    --sidebar-primary: 252 71% 72%;
+
+    --sidebar-primary-foreground: 0 0% 100%;
+
+    --sidebar-accent: 252 71% 96%;
+
+    --sidebar-accent-foreground: 0 0% 13%;
+
+    --sidebar-border: 248 20% 90%;
+
+    --sidebar-ring: 252 71% 72%;
+  }
+
+  .dark {
+    --background: 224 71% 4%;
+    --foreground: 0 0% 98%;
+
+    --card: 224 71% 4%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 224 71% 4%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 252 71% 72%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 4% 16%;
+    --muted-foreground: 0 0% 64%;
+
+    --accent: 250 65% 68%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 258 90% 66%;
+    
+    --sidebar-background: 220 25% 8%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 252 71% 72%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 20% 15%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 220 20% 18%;
+    --sidebar-ring: 252 71% 72%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    @apply font-sans antialiased;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold;
+  }
+
+  button {
+    @apply transition-all duration-200;
+  }
+
+  input[type="range"] {
+    @apply cursor-pointer;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    @apply w-5 h-5 rounded-full bg-primary shadow-md cursor-pointer transition-all duration-200 hover:scale-110;
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    @apply w-5 h-5 rounded-full bg-primary shadow-md cursor-pointer transition-all duration-200 hover:scale-110;
+  }
+}
+
+/* XRL Comfort UI for 13" screens */
+.step-card{
+  max-width: 960px;
+  height: 560px;
+  margin: 24px auto;
+  padding: 0 24px;
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 4px 14px rgba(0,0,0,.06);
+}
+.card-header{height:72px; display:flex; flex-direction:column; justify-content:center}
+.card-body{height: calc(560px - 72px - 72px); overflow:auto; scrollbar-width: none}
+.card-body::-webkit-scrollbar{width:0; height:0}
+.card-actions{
+  position: sticky;
+  bottom: 0;
+  background: var(--surface);
+  padding: 12px 0;
+  min-height:72px;
+  border-top: 1px solid var(--border-hex);
+}
+.step-title{font-size:22px}
+.helper{font-size:14px; color: var(--muted-text)}
+
+.influence-card{
+  background: var(--primary-ghost-hex);
+  border: 1px solid var(--border-hex);
+  border-radius: 12px;
+  padding: 14px 16px;
+  text-align: center;
+}
+.influence-value{font-weight:600; color: var(--text)}
+
+.chip,.tag{
+  background: var(--primary-chip-hex);
+  color: var(--text);
+}
+
+.button-primary{background: var(--primary-hex); color:#fff}
+.button-primary:hover{background: var(--primary-strong-hex)}
+
+.step-card label{font-size:14px; margin-bottom:6px; display:block}
+.step-card input,.step-card textarea,.step-card select{
+  background:#FFF; border:1px solid var(--border-hex); border-radius:10px;
+  padding:10px 12px; min-height:40px; width:100%;
+  transition: border .15s, box-shadow .15s;
+}
+.step-card .textarea{min-height:96px; max-height:160px}
+.chips{max-height:120px; overflow:auto}
+.field-hint,.field-error{min-height:20px}
+.step-title{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.step-card input:focus,.step-card textarea:focus,.step-card select:focus{
+  border-color: var(--primary-hex);
+  box-shadow: 0 0 0 3px var(--primary-ghost-hex);
+  outline: none;
+}
+
+.card-actions .actions-row{display:flex; justify-content:space-between; gap:12px}
+
+.review-grid{display:grid; grid-template-columns: 1fr 1fr; gap: 12px 24px}
+
+@media (max-width: 1366px){
+  .step-card{max-width: 880px; padding:18px 20px}
+  .step-title{font-size:20px}
+  .helper{font-size:13px}
+  .card-actions{padding:10px 0}
+  .review-grid{gap:10px 16px}
+}
