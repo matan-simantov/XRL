@@ -174,4 +174,18 @@ export async function listDrafts(username: string, limit = 5): Promise<DraftReco
   return drafts.slice(0, limit);
 }
 
+export async function clearAllHistory(username: string): Promise<void> {
+  const runsKeyName = runsKey(username);
+  const draftsKeyName = draftsKey(username);
+  localStorage.removeItem(runsKeyName);
+  localStorage.removeItem(draftsKeyName);
+}
+
+export async function deleteRun(username: string, runId: string): Promise<void> {
+  const key = runsKey(username);
+  const runs: RunRecord[] = JSON.parse(localStorage.getItem(key) || "[]");
+  const filtered = runs.filter(r => r.id !== runId);
+  localStorage.setItem(key, JSON.stringify(filtered));
+}
+
 

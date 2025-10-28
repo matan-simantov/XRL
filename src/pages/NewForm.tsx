@@ -7,11 +7,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { SecondaryCategorySelector } from "@/components/SecondaryCategorySelector";
 import { InlineSheetViewer } from "@/components/InlineSheetViewer";
+import { WeightsTable } from "@/components/WeightsTable";
 import { getSession, saveDraft, commitRun } from "@/lib/storage";
+import { useButtonColor } from "@/hooks/use-button-color";
 
 type XrlState = {
   sector: string;
@@ -63,17 +65,19 @@ const NewForm = () => {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [sheetUrl, setSheetUrl] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { getButtonClasses, getTextClass, getBgLightClass } = useButtonColor();
 
   useEffect(() => {
     const username = getSession()?.username;
     if (!username) return;
+    if (currentStep < 2) return; // Only save draft from step 2 onwards
     const timer = setTimeout(() => {
       if (state.isDraft) {
         saveDraft(username, state);
       }
     }, 800);
     return () => clearTimeout(timer);
-  }, [state]);
+  }, [state, currentStep]);
 
   useEffect(() => {
     (async () => {
@@ -149,24 +153,15 @@ const NewForm = () => {
       return;
     }
 
-    setIsSubmitting(true);
     setShowReview(false);
+    setIsSubmitting(true);
 
-    const workingStatuses: DomainSubmitStatus[] = state.domains.map(domain => ({
-      domain,
-      status: "pending" as const
-    }));
-    setDomainStatuses(workingStatuses);
-
-    const user = JSON.parse(localStorage.getItem("xrl_user") || "{}");
+    // Run submission
     let firstSheetUrl: string | null = null;
+    const workingStatuses: DomainSubmitStatus[] = [];
 
     for (let i = 0; i < state.domains.length; i++) {
       const domain = state.domains[i];
-      
-      setDomainStatuses(prev => prev.map((s, idx) => 
-        idx === i ? { ...s, status: "sending" } : s
-      ));
 
       try {
         const payload = {
@@ -199,24 +194,21 @@ const NewForm = () => {
             firstSheetUrl = sheetUrlFromResponse;
           }
 
-          // update local and state
-          workingStatuses[i] = { ...workingStatuses[i], status: "sent", sheetUrl: sheetUrlFromResponse };
-          setDomainStatuses([...workingStatuses]);
+          workingStatuses[i] = { domain, status: "sent", sheetUrl: sheetUrlFromResponse };
         } else {
-          workingStatuses[i] = { ...workingStatuses[i], status: "failed" };
-          setDomainStatuses([...workingStatuses]);
+          workingStatuses[i] = { domain, status: "failed" };
         }
       } catch {
-        workingStatuses[i] = { ...workingStatuses[i], status: "failed" };
-        setDomainStatuses([...workingStatuses]);
+        workingStatuses[i] = { domain, status: "failed" };
       }
     }
 
-    const allSent = workingStatuses.every(s => s.status === "sent" || s.status === "failed");
     const anySent = workingStatuses.some(s => s.status === "sent");
 
     if (anySent) {
       const username = getSession()?.username || "anonymous";
+      const finalSheetUrl = firstSheetUrl || "https://docs.google.com/spreadsheets/d/1E73HW28r-7ddclj22OGNUNvo194FlLHX2zX50XY5I3w/edit?usp=sharing";
+      
       await commitRun(username, {
         sector: state.sector,
         domains: state.domains,
@@ -231,21 +223,24 @@ const NewForm = () => {
         participants_count: state.participants_count,
         participants: state.participants,
         llm_weight_percent: state.llm_weight_percent,
-        sheetUrl: firstSheetUrl || "https://docs.google.com/spreadsheets/d/1E73HW28r-7ddclj22OGNUNvo194FlLHX2zX50XY5I3w/edit?usp=sharing",
+        sheetUrl: finalSheetUrl,
       });
 
-      setSheetUrl(firstSheetUrl || "https://docs.google.com/spreadsheets/d/1E73HW28r-7ddclj22OGNUNvo194FlLHX2zX50XY5I3w/edit?usp=sharing");
+      setSheetUrl(finalSheetUrl);
       setSubmitSuccess(true);
       
-      toast.success("Submissions complete", { 
-        duration: 4000,
+      // Show success with action button
+      toast.success("Submission completed successfully!", { 
+        duration: 10000,
         action: {
-          label: "✕",
-          onClick: () => {}
+          label: "View Results",
+          onClick: () => {
+            window.open(finalSheetUrl, "_blank");
+          }
         }
       });
     } else {
-      toast.error("All submissions failed");
+      toast.error("Submission failed. Please try again.");
     }
 
     setIsSubmitting(false);
@@ -272,7 +267,27 @@ const NewForm = () => {
             <Label className="text-[#111111]">Domain(s) - Select 1 to 5 *</Label>
             <p className="text-sm text-muted-foreground">You can select up to 5 domains. Each will be submitted separately.</p>
             <div className="space-y-2">
-              {["Solar PV", "Wind", "Hydrogen", "Battery Storage", "Nuclear", "Geothermal", "Hydro", "Biomass"].map(domain => (
+              {[
+                "Oil and Gas",
+                "Fossil Fuels",
+                "Nuclear",
+                "Renewable Energy",
+                "Solar",
+                "Wind Energy",
+                "Hydroelectric",
+                "Geothermal Energy",
+                "Biofuel",
+                "Power Grid",
+                "Electrical Distribution",
+                "Charging Infrastructure",
+                "Energy Storage",
+                "Energy Management",
+                "Energy Efficiency",
+                "Clean Energy",
+                "CleanTech",
+                "Alternative Fuels",
+                "Fusion"
+              ].map(domain => (
                 <div key={domain} className="flex items-center space-x-2">
                   <Checkbox 
                     id={domain} 
@@ -305,9 +320,9 @@ const NewForm = () => {
       case 7:
         return <div className="space-y-4"><Label className="text-[#111111]">Compliance</Label><Textarea placeholder="ISO 14040 LCA&#10;EPA permits" value={state.compliance.join("\n")} onChange={(e) => handleTextareaChange("compliance", e.target.value)} rows={6} /></div>;
       case 8:
-        return <div className="space-y-4"><Label className="text-[#111111]">Time Horizon</Label><div className="grid grid-cols-2 gap-3">{["0–6m", "6–12m", "1–3y", "3+y"].map((o) => <Button key={o} variant={state.time_horizon === o ? "default" : "outline"} onClick={() => setState({ ...state, time_horizon: o })} className="h-16">{o}</Button>)}</div></div>;
+        return <div className="space-y-4"><Label className="text-[#111111]">Time Horizon</Label><div className="grid grid-cols-2 gap-3">{["0–6m", "6–12m", "1–3y", "3+y"].map((o) => <Button key={o} variant={state.time_horizon === o ? "default" : "outline"} onClick={() => setState({ ...state, time_horizon: o })} className={state.time_horizon === o ? `h-16 ${getButtonClasses()}` : "h-16"}>{o}</Button>)}</div></div>;
       case 9:
-        return <div className="space-y-4"><Label className="text-[#111111]">Risk Posture</Label><div className="grid gap-3">{["Conservative", "Balanced", "Aggressive"].map((o) => <Button key={o} variant={state.risk_posture === o ? "default" : "outline"} onClick={() => setState({ ...state, risk_posture: o })} className="h-16">{o}</Button>)}</div></div>;
+        return <div className="space-y-4"><Label className="text-[#111111]">Risk Posture</Label><div className="grid gap-3">{["Conservative", "Balanced", "Aggressive"].map((o) => <Button key={o} variant={state.risk_posture === o ? "default" : "outline"} onClick={() => setState({ ...state, risk_posture: o })} className={state.risk_posture === o ? `h-16 ${getButtonClasses()}` : "h-16"}>{o}</Button>)}</div></div>;
       case 10:
         return <div className="space-y-4"><Label className="text-[#111111]">LLM Selection *</Label><div className="space-y-3">{["ChatGPT", "Gemini", "GROK", "DeepSeek", "Claude", "Mistral"].map((llm) => <div key={llm} className="flex items-center space-x-2"><Checkbox id={llm} checked={state.llm.includes(llm)} onCheckedChange={(c) => setState({ ...state, llm: c ? [...state.llm, llm] : state.llm.filter((l) => l !== llm) })} /><Label htmlFor={llm} className="text-[#111111] font-normal">{llm}</Label></div>)}</div></div>;
       case 11:
@@ -330,9 +345,9 @@ const NewForm = () => {
                   onChange={(e) => setState({ ...state, llm_weight_percent: parseInt(e.target.value) })} 
                   className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-[color:var(--primary-ghost-hex)] transition-all duration-200"
                 />
-                <div className="flex justify-between text-xs text-muted-foreground px-1">
+                <div className="flex justify-between text-xs text-muted-foreground px-2.5">
                   {[0,25,50,75,100].map((t) => (
-                    <span key={t}>{t}%</span>
+                    <span key={t} className="inline-block -ml-2 first:ml-0 last:ml-0">{t}%</span>
                   ))}
                 </div>
               </div>
@@ -457,7 +472,7 @@ const NewForm = () => {
               <Button variant="secondary" onClick={handleSaveDraft} className="flex-1 transition-all duration-200 hover:shadow-md">
                 Save as Draft
               </Button>
-              <Button onClick={handleConfirmSubmit} disabled={isSubmitting} className="flex-1 transition-all duration-200 hover:shadow-lg">
+              <Button onClick={handleConfirmSubmit} disabled={isSubmitting} className={`flex-1 transition-all duration-200 hover:shadow-lg ${getButtonClasses()}`}>
                 {isSubmitting ? "Submitting..." : "Confirm & Send Data"}
               </Button>
             </div>
@@ -471,54 +486,65 @@ const NewForm = () => {
     const displaySheetUrl = sheetUrl || defaultSheetUrl;
 
     return (
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="step-card">
-          <div className="step-title text-[#111111]">Submission Status</div>
-          <div className="helper">Sending assessments to n8n...</div>
-          <div className="card-body space-y-3">
-            {domainStatuses.map((ds, idx) => (
-              <div key={idx} className="flex items-center justify-between p-3 rounded-lg border">
-                <span className="font-medium text-[#111111]">{ds.domain}</span>
-                <span className={`text-sm px-3 py-1 rounded ${
-                  ds.status === "pending" ? "bg-gray-100 text-gray-600" :
-                  ds.status === "sending" ? "bg-blue-100 text-blue-600" :
-                  ds.status === "sent" ? "bg-green-100 text-green-600" :
-                  "bg-red-100 text-red-600"
-                }`}>
-                  {ds.status === "pending" ? "Pending" :
-                   ds.status === "sending" ? "Sending..." :
-                   ds.status === "sent" ? "Sent ✓" :
-                   "Failed ✗"}
-                </span>
-              </div>
-            ))}
+          <div className="step-title text-[#111111]">
+            {isSubmitting ? "Processing Submission..." : "Submission Complete"}
           </div>
-          {submitSuccess && (
-            <div className="card-actions">
-              <div className="actions-row">
-                <Button 
-                  onClick={() => setShowWeightsTable(true)} 
-                  className="flex-1 transition-all duration-200 hover:shadow-lg"
-                  size="lg"
-                >
-                  Weights Table
-                </Button>
-                <Button 
-                  variant="outline"
-                  className="flex-1 transition-all duration-200 hover:shadow-md"
-                  size="lg"
-                  onClick={() => {}}
-                >
-                  Result
-                </Button>
+          <div className="helper">
+            {isSubmitting ? "Please wait while we process your data" : "Your submission has been processed successfully"}
+          </div>
+          <div className="card-body flex items-center justify-center min-h-[300px]">
+            {isSubmitting ? (
+              <div className="text-center space-y-4">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto"></div>
+                <p className="text-muted-foreground">Processing your submission...</p>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="text-center space-y-6 w-full">
+                <div className={`w-20 h-20 rounded-full ${getBgLightClass()} flex items-center justify-center mx-auto`}>
+                  <CheckCircle2 className={`h-10 w-10 ${getTextClass()}`} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-foreground mb-2">Success!</h3>
+                  <p className="text-muted-foreground">Your submission has been completed</p>
+                </div>
+                <div className="flex gap-3 justify-center pt-4">
+                  <Button 
+                    onClick={() => setShowWeightsTable(true)} 
+                    className={`${getButtonClasses()} transition-all duration-200 hover:shadow-lg`}
+                    size="lg"
+                  >
+                    View Weights Table
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    className="transition-all duration-200 hover:shadow-md"
+                    size="lg"
+                    onClick={() => {
+                      setState(INITIAL_STATE);
+                      setCurrentStep(1);
+                      setIsSubmitting(false);
+                      setSubmitSuccess(false);
+                      setShowWeightsTable(false);
+                      setSheetUrl(null);
+                    }}
+                  >
+                    New Form
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {showWeightsTable && submitSuccess && (
-          <InlineSheetViewer 
-            sheetUrl={displaySheetUrl}
+          <WeightsTable
+            llms={state.llm}
+            participants={state.participants}
+            domains={state.domains}
+            initialLlmWeight={state.llm_weight_percent}
+            formData={state}
             onClose={() => setShowWeightsTable(false)}
           />
         )}
@@ -527,7 +553,7 @@ const NewForm = () => {
   }
 
   return (
-    <div className="max-w-3xl mx-auto relative">
+    <div className="max-w-6xl mx-auto relative">
       <div className="mb-4">
         <div className="flex justify-between mb-2">
           <p className="text-sm font-medium text-[#111111]">Step {currentStep} of 12</p>
@@ -547,10 +573,15 @@ const NewForm = () => {
         </div>
         <div className="card-actions">
           <div className="actions-row">
-            <Button variant="outline" onClick={handleBack} disabled={currentStep === 1} className="flex-1">
+            <Button 
+              variant="outline" 
+              onClick={handleBack} 
+              disabled={currentStep === 1} 
+              className={`flex-1 ${getTextClass()}`}
+            >
               <ArrowLeft className="h-4 w-4 mr-2" />Back
             </Button>
-            <Button onClick={handleNext} className="flex-1 button-primary">
+            <Button onClick={handleNext} className={`flex-1 ${getButtonClasses()}`}>
               {currentStep === 12 ? "Complete" : (
                 <>
                   Next<ArrowRight className="h-4 w-4 ml-2" />

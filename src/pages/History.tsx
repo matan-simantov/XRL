@@ -1,10 +1,22 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Calendar, CheckCircle2, Share2 } from "lucide-react";
+import { FileText, Calendar, CheckCircle2, Share2, Trash2, X } from "lucide-react";
 import { HistoryDetailModal } from "@/components/HistoryDetailModal";
 import { InlineSheetViewer } from "@/components/InlineSheetViewer";
-import { getSession, listRuns, listDrafts } from "@/lib/storage";
+import { WeightsTable } from "@/components/WeightsTable";
+import { getSession, listRuns, listDrafts, clearAllHistory, deleteRun } from "@/lib/storage";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useButtonColor } from "@/hooks/use-button-color";
 
 interface HistoryEntry {
   id: number;
@@ -33,8 +45,11 @@ const History = () => {
   const [selectedEntry, setSelectedEntry] = useState<any | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showSheetViewer, setShowSheetViewer] = useState(false);
-  const [currentSheetUrl, setCurrentSheetUrl] = useState<string>("");
   const [expanded, setExpanded] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showDeleteSingleDialog, setShowDeleteSingleDialog] = useState(false);
+  const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
+  const { getButtonClasses, getTextClass, getBgLightClass } = useButtonColor();
 
   useEffect(() => {
     const load = async () => {
@@ -60,14 +75,63 @@ const History = () => {
   };
 
   const handleViewWeightsTable = (entry: any) => {
-    const defaultSheetUrl = "https://docs.google.com/spreadsheets/d/1E73HW28r-7ddclj22OGNUNvo194FlLHX2zX50XY5I3w/edit?usp=sharing";
-    setCurrentSheetUrl(entry.sheetUrl || defaultSheetUrl);
+    setSelectedEntry(entry);
     setShowSheetViewer(true);
   };
 
+  const handleDeleteHistory = async () => {
+    const username = getSession()?.username;
+    if (!username) return;
+    
+    await clearAllHistory(username);
+    setSearches([]);
+    setDrafts([]);
+    setRecentSubmissions([]);
+    setShowDeleteDialog(false);
+    
+    // Trigger storage event for other tabs
+    window.dispatchEvent(new Event("storage"));
+  };
+
+  const handleDeleteSingleEntry = async () => {
+    const username = getSession()?.username;
+    if (!username || !entryToDelete) return;
+    
+    await deleteRun(username, entryToDelete);
+    
+    // Reload the lists
+    const [runs, dr] = await Promise.all([
+      listRuns(username, 20),
+      listDrafts(username, 5),
+    ]);
+    const completed = runs.filter((r: any) => r.status === "sent");
+    setSearches(completed);
+    setDrafts(dr);
+    setRecentSubmissions(completed.slice(0, 5));
+    
+    setShowDeleteSingleDialog(false);
+    setEntryToDelete(null);
+    
+    // Trigger storage event for other tabs
+    window.dispatchEvent(new Event("storage"));
+  };
+
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <h1 className="text-3xl font-bold text-foreground mb-6">History</h1>
+    <div className="max-w-6xl mx-auto space-y-8">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold text-foreground">History</h1>
+        {(searches.length > 0 || drafts.length > 0) && (
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setShowDeleteDialog(true)}
+            className="flex items-center gap-2"
+          >
+            <Trash2 className="h-4 w-4" />
+            Clear All History
+          </Button>
+        )}
+      </div>
 
       <Card className="shadow-md rounded-xl border border-border/50">
         <CardHeader>
@@ -84,8 +148,8 @@ const History = () => {
                 className="flex items-center justify-between p-4 rounded-lg border border-border/50 bg-card hover:shadow-md transition-all duration-200"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <CheckCircle2 className="h-5 w-5 text-primary" />
+                  <div className={`w-10 h-10 rounded-lg ${getBgLightClass()} flex items-center justify-center flex-shrink-0`}>
+                    <CheckCircle2 className={`h-5 w-5 ${getTextClass()}`} />
                   </div>
                   <div>
                     <p className="font-medium text-foreground">
@@ -109,7 +173,7 @@ const History = () => {
                   <Button 
                     size="sm"
                     onClick={() => handleViewWeightsTable(submission)}
-                    className="transition-all duration-200 hover:shadow-lg"
+                    className={`transition-all duration-200 hover:shadow-lg ${getButtonClasses()}`}
                   >
                     Weights Table
                   </Button>
@@ -129,12 +193,23 @@ const History = () => {
                   >
                     <Share2 className="mr-1" /> Share
                   </Button>
+                  <Button 
+                    variant="ghost"
+                    size="sm"
+                    className="transition-all duration-200 hover:bg-destructive/10"
+                    onClick={() => {
+                      setEntryToDelete(submission.id);
+                      setShowDeleteSingleDialog(true);
+                    }}
+                  >
+                    <X className="h-4 w-4 text-destructive" />
+                  </Button>
                 </div>
               </div>
             ))
           )}
           <div className="pt-2">
-            <Button variant="link" size="sm" onClick={() => setExpanded(!expanded)}>
+            <Button variant="link" size="sm" onClick={() => setExpanded(!expanded)} className={getTextClass()}>
               {expanded ? "Collapse" : "View all searches"}
             </Button>
           </div>
@@ -157,7 +232,7 @@ const History = () => {
                   <div className="font-medium text-foreground">{d.state?.domains?.join(", ") || "Untitled draft"}</div>
                   <div className="text-muted-foreground">Updated {new Date(d.updatedAt).toLocaleString()}</div>
                 </div>
-                <Button size="sm" onClick={() => window.location.href = "/dashboard/new-form"}>Resume</Button>
+                <Button size="sm" onClick={() => window.location.href = "/dashboard/new-form"} className={getButtonClasses()}>Resume</Button>
               </div>
             ))}
           </div>
@@ -172,14 +247,60 @@ const History = () => {
         entry={selectedEntry} 
       />
 
-      {showSheetViewer && (
+      {showSheetViewer && selectedEntry && (
         <div className="mt-8">
-          <InlineSheetViewer 
-            sheetUrl={currentSheetUrl}
+          <WeightsTable
+            llms={selectedEntry.llm || []}
+            participants={selectedEntry.participants || []}
+            domains={selectedEntry.domains || []}
+            initialLlmWeight={selectedEntry.llm_weight_percent || 50}
+            formData={selectedEntry}
             onClose={() => setShowSheetViewer(false)}
           />
         </div>
       )}
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete all your search history
+              and drafts from local storage.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteHistory}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showDeleteSingleDialog} onOpenChange={setShowDeleteSingleDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this entry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete this search entry
+              from your history.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSingleEntry}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
