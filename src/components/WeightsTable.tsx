@@ -61,12 +61,12 @@ const generateWeightsForColumn = (): number[] => {
   const random = Array.from({ length: 11 }, () => 0.5 + Math.random());
   const sum = random.reduce((a, b) => a + b, 0);
   
-  // Normalize to sum to 100 and round to 1 decimal
-  const normalized = random.map(r => parseFloat(((r / sum) * 100).toFixed(1)));
+  // Normalize to sum to 100 and round to integers
+  const normalized = random.map(r => Math.round((r / sum) * 100));
   
   // Adjust the last value to ensure exact sum of 100
   const currentSum = normalized.slice(0, -1).reduce((a, b) => a + b, 0);
-  normalized[10] = parseFloat((100 - currentSum).toFixed(1));
+  normalized[10] = 100 - currentSum;
   
   return normalized;
 };
@@ -89,9 +89,10 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
   const [disabledParticipants, setDisabledParticipants] = useState<Set<string>>(new Set());
   const [isMeDisabled, setIsMeDisabled] = useState(false);
   
-  // Result column
-  const [showResultColumn, setShowResultColumn] = useState(false);
+  // Results comparison table
+  const [showResultsTable, setShowResultsTable] = useState(false);
   const [resultData, setResultData] = useState<Record<string, Record<number, number>>>({});
+  const [viewMode, setViewMode] = useState<'weights' | 'results'>('weights');
   
   // Generate data for all domains (must be before userWeights)
   const [allDomainsData, setAllDomainsData] = useState(() => {
@@ -155,11 +156,11 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
       // Second pass: normalize to sum to 100 (like generateWeightsForColumn)
       const sum = averages.reduce((a, b) => a + b, 0);
       if (sum > 0) {
-        const normalized = averages.map(v => parseFloat(((v / sum) * 100).toFixed(1)));
+        const normalized = averages.map(v => Math.round((v / sum) * 100));
         
         // Adjust the last value to ensure exact sum of 100
         const currentSum = normalized.slice(0, -1).reduce((a, b) => a + b, 0);
-        normalized[normalized.length - 1] = parseFloat((100 - currentSum).toFixed(1));
+        normalized[normalized.length - 1] = 100 - currentSum;
         
         parameters.forEach((_, paramIndex) => {
           weights[domain][paramIndex] = normalized[paramIndex];
@@ -177,7 +178,7 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
   const currentDomain = domains[currentDomainIndex];
   const data = allDomainsData[currentDomain];
 
-  // Refresh participants data with new random weights
+  // Refresh participants data with new random weights (only for participants with no data)
   const handleRefreshParticipants = () => {
     if (participants.length === 0) return;
     
@@ -188,18 +189,27 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
       domains.forEach((domain) => {
         const domainData = { ...newData[domain] };
         
-        // Generate new weights for each participant
+        // Generate new weights only for participants without data
         participants.forEach((participant) => {
-          const weights = generateWeightsForColumn();
-          weights.forEach((weight, paramIndex) => {
-            if (!domainData[paramIndex]) {
-              domainData[paramIndex] = {};
-            }
-            domainData[paramIndex] = {
-              ...domainData[paramIndex],
-              [participant.name]: weight,
-            };
+          // Check if this participant already has data
+          const hasData = parameters.some((_, paramIndex) => {
+            return domainData[paramIndex]?.[participant.name] !== null && 
+                   domainData[paramIndex]?.[participant.name] !== undefined;
           });
+          
+          // Only generate new weights if participant has no data
+          if (!hasData) {
+            const weights = generateWeightsForColumn();
+            weights.forEach((weight, paramIndex) => {
+              if (!domainData[paramIndex]) {
+                domainData[paramIndex] = {};
+              }
+              domainData[paramIndex] = {
+                ...domainData[paramIndex],
+                [participant.name]: weight,
+              };
+            });
+          }
         });
         
         newData[domain] = domainData;
@@ -209,7 +219,7 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
     });
     
     toast.success("Participants data refreshed", {
-      description: "New weights have been generated for all participants.",
+      description: "New weights have been generated for participants without existing data.",
     });
   };
 
@@ -246,7 +256,7 @@ Best regards`);
 
   // Handle user weight change
   const handleUserWeightChange = (paramIndex: number, value: string) => {
-    const numValue = value === "" ? null : parseFloat(value);
+    const numValue = value === "" ? null : parseInt(value);
     setUserWeights((prev) => ({
       ...prev,
       [currentDomain]: {
@@ -354,9 +364,9 @@ Best regards`);
   const handleConfirmWeights = () => {
     // Check if Me column sum is 100
     const meTotal = calculateUserTotal();
-    if (Math.abs(meTotal - 100) > 0.1 && meTotal > 0) {
-      toast.error("Me column total must equal 100", {
-        description: `Current total: ${meTotal.toFixed(1)}. Please adjust your weights.`,
+    if (meTotal !== 100 && meTotal > 0) {
+      toast.error("YOU column total must equal 100", {
+        description: `Current total: ${Math.round(meTotal)}. Please adjust your weights.`,
       });
       return;
     }
@@ -498,11 +508,12 @@ Best regards`);
     });
     
     setResultData(results);
-    setShowResultColumn(true);
+    setShowResultsTable(true);
+    setViewMode('results');
     setShowConfirmDialog(false);
     
     toast.success("Results generated successfully!", {
-      description: "The Result column has been added to the table.",
+      description: "View the comparison table across all domains.",
     });
   };
 
@@ -547,12 +558,12 @@ Best regards`);
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Generate new weights for participants</p>
+                      <p>Generate weights for participants without existing data</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               )}
-              {!showResultColumn && (
+              {!showResultsTable && (
                 <Button 
                   onClick={handleConfirmWeights}
                   className="bg-green-600 hover:bg-green-700 text-white"
@@ -562,12 +573,30 @@ Best regards`);
                   Confirm
                 </Button>
               )}
+              {showResultsTable && (
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={() => setViewMode('weights')}
+                    variant={viewMode === 'weights' ? 'default' : 'outline'}
+                    size="sm"
+                  >
+                    Weights Table
+                  </Button>
+                  <Button 
+                    onClick={() => setViewMode('results')}
+                    variant={viewMode === 'results' ? 'default' : 'outline'}
+                    size="sm"
+                  >
+                    Results Comparison
+                  </Button>
+                </div>
+              )}
               <Button variant="ghost" size="sm" onClick={onClose}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
           </div>
-          {domains.length > 1 && (
+          {viewMode === 'weights' && domains.length > 1 && (
             <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
               <Button
                 variant="outline"
@@ -594,7 +623,7 @@ Best regards`);
               </Button>
             </div>
           )}
-          {domains.length === 1 && (
+          {viewMode === 'weights' && domains.length === 1 && (
             <div className="text-center mt-2 pt-2 border-t border-border">
               <p className="text-sm text-muted-foreground">Sector</p>
               <p className="text-lg font-semibold">{currentDomain}</p>
@@ -602,12 +631,27 @@ Best regards`);
           )}
         </CardHeader>
         <CardContent>
+          {viewMode === 'weights' && (
+          <>
           <div className="overflow-x-auto">
             <table className="border-collapse mx-auto">
               <thead>
                 <tr className="border-b-2 border-border">
                   <th className="text-center p-3 font-semibold text-foreground bg-background whitespace-nowrap">
                     Parameter
+                  </th>
+                  <th className={`text-center p-2 font-semibold whitespace-nowrap ${isMeDisabled ? 'text-muted-foreground bg-muted/30' : 'text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-950'}`}>
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="font-bold">YOU</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5"
+                        onClick={() => setIsMeDisabled(!isMeDisabled)}
+                      >
+                        {isMeDisabled ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                      </Button>
+                    </div>
                   </th>
                   {llms.map((llm, idx) => {
                     const isDisabled = disabledLlms.has(llm);
@@ -627,19 +671,6 @@ Best regards`);
                       </th>
                     );
                   })}
-                  <th className={`text-center p-2 font-semibold whitespace-nowrap ${isMeDisabled ? 'text-muted-foreground bg-muted/30' : 'text-foreground bg-blue-50 dark:bg-blue-950'}`}>
-                    <div className="flex flex-col items-center gap-1">
-                      <span>Me</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5"
-                        onClick={() => setIsMeDisabled(!isMeDisabled)}
-                      >
-                        {isMeDisabled ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                      </Button>
-                    </div>
-                  </th>
                   {participants.map((participant, idx) => {
                     const isDisabled = disabledParticipants.has(participant.name);
                     return (
@@ -671,11 +702,6 @@ Best regards`);
                   <th className="text-center p-2 font-semibold text-foreground bg-primary/10 whitespace-nowrap">
                     Final Weight
                   </th>
-                  {showResultColumn && (
-                    <th className="text-center p-2 font-semibold text-foreground bg-green-100 dark:bg-green-900/30 whitespace-nowrap">
-                      Result
-                    </th>
-                  )}
                 </tr>
               </thead>
               <tbody>
@@ -695,6 +721,21 @@ Best regards`);
                         </Tooltip>
                       </TooltipProvider>
                     </td>
+                    <td className={`p-2 ${isMeDisabled ? 'bg-muted/30' : 'bg-blue-100/70 dark:bg-blue-950/70'}`}>
+                      <div className="flex justify-center items-center">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="1"
+                          value={userWeights[currentDomain][paramIndex] ?? ""}
+                          onChange={(e) => handleUserWeightChange(paramIndex, e.target.value)}
+                          className={`w-16 h-8 text-center text-sm font-semibold ${isMeDisabled ? 'opacity-50' : 'border-blue-300 dark:border-blue-700'}`}
+                          placeholder="-"
+                          disabled={isMeDisabled}
+                        />
+                      </div>
+                    </td>
                     {llms.map((llm, colIndex) => {
                       const isDisabled = disabledLlms.has(llm);
                       return (
@@ -703,21 +744,6 @@ Best regards`);
                         </td>
                       );
                     })}
-                    <td className={`p-2 ${isMeDisabled ? 'bg-muted/30' : 'bg-blue-50/50 dark:bg-blue-950/50'}`}>
-                      <div className="flex justify-center items-center">
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          value={userWeights[currentDomain][paramIndex] ?? ""}
-                          onChange={(e) => handleUserWeightChange(paramIndex, e.target.value)}
-                          className={`w-16 h-8 text-center text-sm ${isMeDisabled ? 'opacity-50' : ''}`}
-                          placeholder="-"
-                          disabled={isMeDisabled}
-                        />
-                      </div>
-                    </td>
                     {participants.map((participant, colIndex) => {
                       const value = data[paramIndex][participant.name];
                       const isDisabled = disabledParticipants.has(participant.name);
@@ -732,26 +758,26 @@ Best regards`);
                       );
                     })}
                     <td className="text-center p-2 text-foreground text-sm font-semibold bg-primary/5">
-                      {calculateFinalWeight(paramIndex).toFixed(1)}
+                      {Math.round(calculateFinalWeight(paramIndex))}
                     </td>
-                    {showResultColumn && (
-                      <td className="text-center p-2 text-foreground text-sm font-bold bg-green-50 dark:bg-green-950/30">
-                        {(() => {
-                          const value = resultData[currentDomain]?.[paramIndex];
-                          if (value === undefined || value === null) return "-";
-                          
-                          // Format based on parameter type
-                          if (paramIndex === 8) return `${value}%`; // Ratio percentage
-                          if (paramIndex === 9) return value.toFixed(2); // New Blood Flow (decimal)
-                          if (paramIndex === 10) return `${value} yrs`; // Average age in years
-                          return Math.round(value).toString(); // Whole numbers for counts
-                        })()}
-                      </td>
-                    )}
                   </tr>
                 ))}
                 <tr className="border-t-2 border-border font-semibold bg-accent/30">
                   <td className="p-2 bg-background text-center whitespace-nowrap">Total</td>
+                  <td className={`text-center p-2 text-sm font-semibold ${
+                    isMeDisabled 
+                      ? 'bg-muted/30 text-muted-foreground' 
+                      : 'bg-blue-100/70 dark:bg-blue-950/70 text-blue-700 dark:text-blue-400'
+                  } ${
+                    !isMeDisabled && calculateUserTotal() !== 100 && calculateUserTotal() > 0
+                      ? "text-red-600 dark:text-red-400"
+                      : ""
+                  }`}>
+                    {Math.round(calculateUserTotal())}
+                    {!isMeDisabled && calculateUserTotal() !== 100 && calculateUserTotal() > 0 && (
+                      <span className="text-xs ml-1">(!)</span>
+                    )}
+                  </td>
                   {llms.map((llm, idx) => {
                     const sum = parameters.reduce((acc, _, paramIndex) => {
                       const value = data[paramIndex][llm];
@@ -760,24 +786,10 @@ Best regards`);
                     const isDisabled = disabledLlms.has(llm);
                     return (
                       <td key={idx} className={`text-center p-2 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : 'text-foreground'}`}>
-                        {sum.toFixed(1)}
+                        {Math.round(sum)}
                       </td>
                     );
                   })}
-                  <td className={`text-center p-2 text-sm font-semibold ${
-                    isMeDisabled 
-                      ? 'bg-muted/30 text-muted-foreground' 
-                      : 'bg-blue-50/50 dark:bg-blue-950/50'
-                  } ${
-                    !isMeDisabled && Math.abs(calculateUserTotal() - 100) > 0.1 && calculateUserTotal() > 0
-                      ? "text-red-600 dark:text-red-400"
-                      : ""
-                  }`}>
-                    {calculateUserTotal().toFixed(1)}
-                    {!isMeDisabled && Math.abs(calculateUserTotal() - 100) > 0.1 && calculateUserTotal() > 0 && (
-                      <span className="text-xs ml-1">(!)</span>
-                    )}
-                  </td>
                   {participants.map((participant, idx) => {
                     const sum = parameters.reduce((acc, _, paramIndex) => {
                       const value = data[paramIndex][participant.name];
@@ -788,7 +800,7 @@ Best regards`);
                     return (
                       <td key={`participant-total-${idx}`} className={`text-center p-2 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : ''}`}>
                         {hasData ? (
-                          <span className={`font-semibold ${isDisabled ? 'text-muted-foreground' : 'text-foreground'}`}>{sum.toFixed(1)}</span>
+                          <span className={`font-semibold ${isDisabled ? 'text-muted-foreground' : 'text-foreground'}`}>{Math.round(sum)}</span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
@@ -796,13 +808,8 @@ Best regards`);
                     );
                   })}
                   <td className="text-center p-2 text-foreground text-sm font-semibold bg-primary/10">
-                    {parameters.reduce((sum, _, paramIndex) => sum + calculateFinalWeight(paramIndex), 0).toFixed(1)}
+                    {Math.round(parameters.reduce((sum, _, paramIndex) => sum + calculateFinalWeight(paramIndex), 0))}
                   </td>
-                  {showResultColumn && (
-                    <td className="text-center p-2 text-foreground text-sm font-bold bg-green-100 dark:bg-green-900/30">
-                      -
-                    </td>
-                  )}
                 </tr>
               </tbody>
             </table>
@@ -848,6 +855,63 @@ Best regards`);
               </div>
             </div>
           </div>
+          </>
+          )}
+
+          {viewMode === 'results' && showResultsTable && (
+            <div className="overflow-x-auto">
+              <table className="border-collapse mx-auto">
+                <thead>
+                  <tr className="border-b-2 border-border">
+                    <th className="text-center p-3 font-semibold text-foreground bg-background whitespace-nowrap">
+                      Parameter
+                    </th>
+                    {domains.map((domain, idx) => (
+                      <th key={idx} className="text-center p-2 font-semibold text-foreground whitespace-nowrap">
+                        {domain}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {parameters.map((param, paramIndex) => (
+                    <tr key={paramIndex} className="border-b border-border hover:bg-accent/50 transition-colors">
+                      <td className="p-2 bg-background text-center whitespace-nowrap">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="font-medium text-foreground cursor-help text-sm">
+                                {param.short}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-xs">
+                              <p>{param.full}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </td>
+                      {domains.map((domain, domainIdx) => {
+                        const value = resultData[domain]?.[paramIndex];
+                        return (
+                          <td key={domainIdx} className="text-center p-2 text-foreground text-sm font-semibold bg-green-50 dark:bg-green-950/30">
+                            {(() => {
+                              if (value === undefined || value === null) return "-";
+                              
+                              // Format based on parameter type
+                              if (paramIndex === 8) return `${value}%`; // Ratio percentage
+                              if (paramIndex === 9) return value.toFixed(2); // New Blood Flow (decimal)
+                              if (paramIndex === 10) return `${value} yrs`; // Average age in years
+                              return Math.round(value).toString(); // Whole numbers for counts
+                            })()}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
