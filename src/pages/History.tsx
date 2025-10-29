@@ -16,6 +16,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 import { useButtonColor } from "@/hooks/use-button-color";
 
 interface HistoryEntry {
@@ -49,6 +67,10 @@ const History = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDeleteSingleDialog, setShowDeleteSingleDialog] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [entryToShare, setEntryToShare] = useState<any | null>(null);
+  const [selectedEmail, setSelectedEmail] = useState<string>("");
+  const [customEmail, setCustomEmail] = useState<string>("");
   const { getButtonClasses, getTextClass, getBgLightClass } = useButtonColor();
 
   useEffect(() => {
@@ -63,6 +85,21 @@ const History = () => {
       setSearches(completed);
       setDrafts(dr);
       setRecentSubmissions(completed.slice(0, 5));
+      
+      // Check if we should auto-open weights table for a specific run
+      const runIdToOpen = localStorage.getItem("xrl:openWeightsTableForRun");
+      if (runIdToOpen) {
+        const runToOpen = completed.find((r: any) => r.id === runIdToOpen);
+        if (runToOpen) {
+          setSelectedEntry(runToOpen);
+          setShowSheetViewer(true);
+          // Scroll to the weights table after a short delay
+          setTimeout(() => {
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+          }, 300);
+        }
+        localStorage.removeItem("xrl:openWeightsTableForRun");
+      }
     };
     load();
     window.addEventListener("storage", load);
@@ -114,6 +151,58 @@ const History = () => {
     
     // Trigger storage event for other tabs
     window.dispatchEvent(new Event("storage"));
+  };
+
+  const handleShare = (entry: any) => {
+    // Check if results have been generated
+    if (!entry.tableState?.showResultsTable) {
+      toast.error("Please confirm the weights before sharing results", {
+        duration: 4000,
+        position: "top-center",
+      });
+      return;
+    }
+
+    setEntryToShare(entry);
+    setSelectedEmail("");
+    setCustomEmail("");
+    setShowShareDialog(true);
+  };
+
+  const handleSendEmail = async () => {
+    const emailToSend = selectedEmail === "custom" ? customEmail : selectedEmail;
+    
+    if (!emailToSend || !entryToShare) {
+      toast.error("Please select or enter an email address");
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailToSend)) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
+    try {
+      // Prepare results data
+      const resultsData = {
+        sector: entryToShare.sector,
+        domains: entryToShare.domains,
+        results: entryToShare.tableState?.resultData || {},
+        timestamp: new Date(entryToShare.timestamp).toLocaleDateString(),
+      };
+
+      // TODO: Implement EmailJS here to send actual email
+      console.log("Sending results to:", emailToSend, resultsData);
+
+      toast.success(`Results shared successfully to ${emailToSend}`);
+      setShowShareDialog(false);
+      setEntryToShare(null);
+    } catch (error) {
+      console.error("Failed to send email:", error);
+      toast.error("Failed to send email. Please try again.");
+    }
   };
 
   return (
@@ -175,21 +264,13 @@ const History = () => {
                     onClick={() => handleViewWeightsTable(submission)}
                     className={`transition-all duration-200 hover:shadow-lg ${getButtonClasses()}`}
                   >
-                    Weights Table
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    size="sm"
-                    className="transition-all duration-200"
-                    onClick={() => {}}
-                  >
-                    Result
+                    Results
                   </Button>
                   <Button 
                     variant="ghost"
                     size="sm"
                     className="transition-all duration-200"
-                    onClick={() => {}}
+                    onClick={() => handleShare(submission)}
                   >
                     <Share2 className="mr-1" /> Share
                   </Button>
@@ -259,6 +340,64 @@ const History = () => {
           />
         </div>
       )}
+
+      <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share Results</DialogTitle>
+            <DialogDescription>
+              Send the results to an email address.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email-select">Select Email</Label>
+              <Select value={selectedEmail} onValueChange={setSelectedEmail}>
+                <SelectTrigger id="email-select">
+                  <SelectValue placeholder="Choose from participants or enter custom" />
+                </SelectTrigger>
+                <SelectContent>
+                  {entryToShare?.participants?.map((p: any, idx: number) => (
+                    <SelectItem key={idx} value={p.email}>
+                      {p.name} ({p.email})
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="custom">Custom Email</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {selectedEmail === "custom" && (
+              <div className="space-y-2">
+                <Label htmlFor="custom-email">Email Address</Label>
+                <Input
+                  id="custom-email"
+                  type="email"
+                  placeholder="Enter email address"
+                  value={customEmail}
+                  onChange={(e) => setCustomEmail(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter className="sm:justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setShowShareDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSendEmail}
+              className={getButtonClasses()}
+            >
+              Send Email
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>

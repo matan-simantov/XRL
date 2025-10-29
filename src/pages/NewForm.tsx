@@ -156,6 +156,20 @@ const NewForm = () => {
     setShowReview(false);
     setIsSubmitting(true);
 
+    // Send domains to Crunchbase webhook
+    try {
+      await fetch("https://shooky5.app.n8n.cloud/webhook/xrl-crunchbase-input", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          domains: state.domains
+        }),
+      });
+    } catch (error) {
+      console.error("Failed to send domains to Crunchbase webhook:", error);
+      // Don't stop the main submission if this fails
+    }
+
     // Run submission
     let firstSheetUrl: string | null = null;
     const workingStatuses: DomainSubmitStatus[] = [];
@@ -209,7 +223,7 @@ const NewForm = () => {
       const username = getSession()?.username || "anonymous";
       const finalSheetUrl = firstSheetUrl || "https://docs.google.com/spreadsheets/d/1E73HW28r-7ddclj22OGNUNvo194FlLHX2zX50XY5I3w/edit?usp=sharing";
       
-      await commitRun(username, {
+      const savedRun = await commitRun(username, {
         sector: state.sector,
         domains: state.domains,
         secondary_category: state.secondary_category,
@@ -229,13 +243,27 @@ const NewForm = () => {
       setSheetUrl(finalSheetUrl);
       setSubmitSuccess(true);
       
+      // Store the run ID for opening weights table from anywhere
+      localStorage.setItem("xrl:lastSubmittedRunId", savedRun.id);
+      
       // Show success with action button
       toast.success("Submission completed successfully!", { 
         duration: 10000,
         action: {
           label: "View Results",
           onClick: () => {
-            window.open(finalSheetUrl, "_blank");
+            // Try to open weights table if on NewForm page
+            setShowWeightsTable(true);
+            setTimeout(() => {
+              const tableElement = document.querySelector('[data-weights-table]');
+              if (tableElement) {
+                tableElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              } else {
+                // If not on NewForm page, navigate to history and open the weights table
+                localStorage.setItem("xrl:openWeightsTableForRun", savedRun.id);
+                navigate("/dashboard/history");
+              }
+            }, 100);
           }
         }
       });
@@ -539,14 +567,16 @@ const NewForm = () => {
         </div>
 
         {showWeightsTable && submitSuccess && (
-          <WeightsTable
-            llms={state.llm}
-            participants={state.participants}
-            domains={state.domains}
-            initialLlmWeight={state.llm_weight_percent}
-            formData={state}
-            onClose={() => setShowWeightsTable(false)}
-          />
+          <div data-weights-table>
+            <WeightsTable
+              llms={state.llm}
+              participants={state.participants}
+              domains={state.domains}
+              initialLlmWeight={state.llm_weight_percent}
+              formData={state}
+              onClose={() => setShowWeightsTable(false)}
+            />
+          </div>
         )}
       </div>
     );

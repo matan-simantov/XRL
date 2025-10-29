@@ -41,6 +41,17 @@ export type RunRecord = {
   llm_weight_percent: number;
   sheetUrl: string | null;
   status: "sent";
+  tableState?: {
+    allDomainsData: any;
+    userWeights: any;
+    resultData: any;
+    llmWeight: number;
+    disabledLlms: string[];
+    disabledParticipants: string[];
+    isMeDisabled: boolean;
+    showResultsTable: boolean;
+    viewMode: 'weights' | 'results';
+  };
 };
 
 export type DraftRecord = {
@@ -186,6 +197,24 @@ export async function deleteRun(username: string, runId: string): Promise<void> 
   const runs: RunRecord[] = JSON.parse(localStorage.getItem(key) || "[]");
   const filtered = runs.filter(r => r.id !== runId);
   localStorage.setItem(key, JSON.stringify(filtered));
+}
+
+export async function updateRunTableState(
+  username: string, 
+  runId: string, 
+  tableState: RunRecord['tableState']
+): Promise<void> {
+  const key = runsKey(username);
+  const runs: RunRecord[] = JSON.parse(localStorage.getItem(key) || "[]");
+  const runIndex = runs.findIndex(r => r.id === runId);
+  
+  if (runIndex >= 0) {
+    runs[runIndex] = {
+      ...runs[runIndex],
+      tableState,
+    };
+    localStorage.setItem(key, JSON.stringify(runs));
+  }
 }
 
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { X, Mail, ChevronLeft, ChevronRight, RefreshCw, Eye, EyeOff, FileText, CheckCircle } from "lucide-react";
@@ -31,6 +31,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { useButtonColor } from "@/hooks/use-button-color";
 import { toast } from "sonner";
+import { updateRunTableState, getSession } from "@/lib/storage";
 
 interface WeightsTableProps {
   llms: string[];
@@ -82,6 +83,10 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
   const [emailSubject, setEmailSubject] = useState("");
   const [emailMessage, setEmailMessage] = useState("");
   const [currentDomainIndex, setCurrentDomainIndex] = useState(0);
+  
+  // Load from saved state if available (recalculate on formData change)
+  const savedState = formData?.tableState;
+  
   const [llmWeight, setLlmWeight] = useState(initialLlmWeight);
   
   // Track which columns are disabled
@@ -92,10 +97,11 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
   // Results comparison table
   const [showResultsTable, setShowResultsTable] = useState(false);
   const [resultData, setResultData] = useState<Record<string, Record<number, number>>>({});
+  // Always start with weights view when opening from History
   const [viewMode, setViewMode] = useState<'weights' | 'results'>('weights');
   
   // Generate data for all domains (must be before userWeights)
-  const [allDomainsData, setAllDomainsData] = useState(() => {
+  const generateInitialDomainsData = () => {
     const domainsData: Record<string, Record<number, Record<string, number | null>>> = {};
     
     domains.forEach((domain) => {
@@ -125,58 +131,201 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
     });
     
     return domainsData;
-  });
+  };
+  
+  const [allDomainsData, setAllDomainsData] = useState(generateInitialDomainsData);
 
-  // User's custom weights for each domain - initialized with LLM average
-  const [userWeights, setUserWeights] = useState<Record<string, Record<number, number | null>>>(() => {
-    const weights: Record<string, Record<number, number | null>> = {};
-    
-    domains.forEach((domain) => {
-      weights[domain] = {};
+  // User's custom weights for each domain - will be initialized in useEffect
+  const [userWeights, setUserWeights] = useState<Record<string, Record<number, number | null>>>({});
+
+  const currentDomain = domains[currentDomainIndex] || domains[0] || "";
+  const data = allDomainsData[currentDomain] || {};
+
+  // Initialize or reset state when component mounts or formData changes
+  useEffect(() => {
+    if (savedState) {
+      // Load saved state for this specific run
+      if (savedState.allDomainsData) {
+        setAllDomainsData(savedState.allDomainsData);
+      } else {
+        setAllDomainsData(generateInitialDomainsData());
+      }
       
-      // First pass: calculate all averages
-      const averages: number[] = [];
-      parameters.forEach((_, paramIndex) => {
-        // Calculate average of LLMs for this parameter
-        let llmSum = 0;
-        let llmCount = 0;
+      if (savedState.userWeights) {
+        setUserWeights(savedState.userWeights);
+      } else {
+        // Calculate initial userWeights from allDomainsData
+        const initUserWeights = () => {
+          const weights: Record<string, Record<number, number | null>> = {};
+          
+          domains.forEach((domain) => {
+            weights[domain] = {};
+            
+            // First pass: calculate all averages
+            const averages: number[] = [];
+            parameters.forEach((_, paramIndex) => {
+              // Calculate average of LLMs for this parameter
+              let llmSum = 0;
+              let llmCount = 0;
+              
+              llms.forEach((llm) => {
+                const value = (savedState.allDomainsData || allDomainsData)[domain]?.[paramIndex]?.[llm];
+                if (value !== null && value !== undefined) {
+                  llmSum += value;
+                  llmCount++;
+                }
+              });
+              
+              const llmAvg = llmCount > 0 ? llmSum / llmCount : 0;
+              averages.push(llmAvg);
+            });
+            
+            // Second pass: normalize to sum to 100
+            const sum = averages.reduce((a, b) => a + b, 0);
+            if (sum > 0) {
+              const normalized = averages.map(v => Math.round((v / sum) * 100));
+              
+              // Adjust the last value to ensure exact sum of 100
+              const currentSum = normalized.slice(0, -1).reduce((a, b) => a + b, 0);
+              normalized[normalized.length - 1] = 100 - currentSum;
+              
+              parameters.forEach((_, paramIndex) => {
+                weights[domain][paramIndex] = normalized[paramIndex];
+              });
+            } else {
+              parameters.forEach((_, paramIndex) => {
+                weights[domain][paramIndex] = null;
+              });
+            }
+          });
+          
+          return weights;
+        };
         
-        llms.forEach((llm) => {
-          const value = allDomainsData[domain]?.[paramIndex]?.[llm];
-          if (value !== null && value !== undefined) {
-            llmSum += value;
-            llmCount++;
+        setUserWeights(initUserWeights());
+      }
+      
+      if (savedState.resultData) {
+        setResultData(savedState.resultData);
+      }
+      if (savedState.llmWeight !== undefined) {
+        setLlmWeight(savedState.llmWeight);
+      } else {
+        setLlmWeight(initialLlmWeight);
+      }
+      if (savedState.disabledLlms) {
+        setDisabledLlms(new Set(savedState.disabledLlms));
+      } else {
+        setDisabledLlms(new Set());
+      }
+      if (savedState.disabledParticipants) {
+        setDisabledParticipants(new Set(savedState.disabledParticipants));
+      } else {
+        setDisabledParticipants(new Set());
+      }
+      if (savedState.isMeDisabled !== undefined) {
+        setIsMeDisabled(savedState.isMeDisabled);
+      } else {
+        setIsMeDisabled(false);
+      }
+      if (savedState.showResultsTable !== undefined) {
+        setShowResultsTable(savedState.showResultsTable);
+      } else {
+        setShowResultsTable(false);
+      }
+      setViewMode('weights');
+    } else {
+      // No saved state, initialize fresh
+      const initDomainsData = generateInitialDomainsData();
+      setAllDomainsData(initDomainsData);
+      
+      // Calculate initial userWeights
+      const initUserWeights = () => {
+        const weights: Record<string, Record<number, number | null>> = {};
+        
+        domains.forEach((domain) => {
+          weights[domain] = {};
+          
+          const averages: number[] = [];
+          parameters.forEach((_, paramIndex) => {
+            let llmSum = 0;
+            let llmCount = 0;
+            
+            llms.forEach((llm) => {
+              const value = initDomainsData[domain]?.[paramIndex]?.[llm];
+              if (value !== null && value !== undefined) {
+                llmSum += value;
+                llmCount++;
+              }
+            });
+            
+            const llmAvg = llmCount > 0 ? llmSum / llmCount : 0;
+            averages.push(llmAvg);
+          });
+          
+          const sum = averages.reduce((a, b) => a + b, 0);
+          if (sum > 0) {
+            const normalized = averages.map(v => Math.round((v / sum) * 100));
+            const currentSum = normalized.slice(0, -1).reduce((a, b) => a + b, 0);
+            normalized[normalized.length - 1] = 100 - currentSum;
+            
+            parameters.forEach((_, paramIndex) => {
+              weights[domain][paramIndex] = normalized[paramIndex];
+            });
+          } else {
+            parameters.forEach((_, paramIndex) => {
+              weights[domain][paramIndex] = null;
+            });
           }
         });
         
-        const llmAvg = llmCount > 0 ? llmSum / llmCount : 0;
-        averages.push(llmAvg);
-      });
+        return weights;
+      };
       
-      // Second pass: normalize to sum to 100 (like generateWeightsForColumn)
-      const sum = averages.reduce((a, b) => a + b, 0);
-      if (sum > 0) {
-        const normalized = averages.map(v => Math.round((v / sum) * 100));
-        
-        // Adjust the last value to ensure exact sum of 100
-        const currentSum = normalized.slice(0, -1).reduce((a, b) => a + b, 0);
-        normalized[normalized.length - 1] = 100 - currentSum;
-        
-        parameters.forEach((_, paramIndex) => {
-          weights[domain][paramIndex] = normalized[paramIndex];
-        });
-      } else {
-        parameters.forEach((_, paramIndex) => {
-          weights[domain][paramIndex] = null;
-        });
-      }
-    });
-    
-    return weights;
-  });
+      setUserWeights(initUserWeights());
+      setLlmWeight(initialLlmWeight);
+      setDisabledLlms(new Set());
+      setDisabledParticipants(new Set());
+      setIsMeDisabled(false);
+      setShowResultsTable(false);
+      setResultData({});
+      setViewMode('weights');
+    }
+  }, [formData?.id, llms.length, participants.length, domains.length]); // Re-run when data structure changes
 
-  const currentDomain = domains[currentDomainIndex];
-  const data = allDomainsData[currentDomain];
+  // Auto-save table state to localStorage whenever it changes
+  useEffect(() => {
+    const saveTableState = async () => {
+      const session = getSession();
+      if (session?.username && formData?.id && showResultsTable) {
+        const tableState = {
+          allDomainsData,
+          userWeights,
+          resultData,
+          llmWeight,
+          disabledLlms: Array.from(disabledLlms),
+          disabledParticipants: Array.from(disabledParticipants),
+          isMeDisabled,
+          showResultsTable,
+          viewMode: 'weights' as const, // Always save as weights to start there next time
+        };
+        
+        await updateRunTableState(session.username, formData.id, tableState);
+      }
+    };
+    
+    saveTableState();
+  }, [
+    allDomainsData,
+    userWeights,
+    resultData,
+    llmWeight,
+    disabledLlms,
+    disabledParticipants,
+    isMeDisabled,
+    showResultsTable,
+    formData
+  ]);
 
   // Refresh participants data with new random weights (only for participants with no data)
   const handleRefreshParticipants = () => {
@@ -268,6 +417,7 @@ Best regards`);
 
   // Calculate user's total for validation
   const calculateUserTotal = (): number => {
+    if (!userWeights[currentDomain]) return 0;
     return parameters.reduce((sum, _, paramIndex) => {
       const value = userWeights[currentDomain][paramIndex];
       return sum + (value || 0);
@@ -320,7 +470,7 @@ Best regards`);
     let humanCount = 0;
     
     // Add user's weight if enabled
-    if (!isMeDisabled) {
+    if (!isMeDisabled && userWeights[currentDomain]) {
       const meValue = userWeights[currentDomain][paramIndex];
       if (meValue !== null && meValue !== undefined) {
         humanSum += meValue;
@@ -509,20 +659,31 @@ Best regards`);
     
     setResultData(results);
     setShowResultsTable(true);
-    setViewMode('results');
+    setViewMode('results'); // Navigate to results view automatically
     setShowConfirmDialog(false);
     
     toast.success("Results generated successfully!", {
-      description: "View the comparison table across all domains.",
+      description: "Viewing comparison results across all domains.",
     });
   };
 
+  // Don't render if essential data is not loaded yet
+  if (!currentDomain || Object.keys(data).length === 0 || Object.keys(userWeights).length === 0 || !userWeights[currentDomain]) {
+    return (
+      <Card className="mt-6 shadow-lg mx-auto w-full max-w-[95vw] p-8">
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Loading table data...</p>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <>
-      <Card className="mt-6 shadow-lg mx-auto" style={{ width: 'fit-content', maxWidth: '100%' }}>
+      <Card className="mt-6 shadow-lg mx-auto w-full max-w-[95vw]">
         <CardHeader>
           <div className="flex flex-row items-center justify-between">
-            <CardTitle>Weights Table</CardTitle>
+            <CardTitle>Results</CardTitle>
             <div className="flex items-center gap-2">
               {formData && (
                 <TooltipProvider>
@@ -580,14 +741,14 @@ Best regards`);
                     variant={viewMode === 'weights' ? 'default' : 'outline'}
                     size="sm"
                   >
-                    Weights Table
+                    Weights
                   </Button>
                   <Button 
                     onClick={() => setViewMode('results')}
                     variant={viewMode === 'results' ? 'default' : 'outline'}
                     size="sm"
                   >
-                    Results Comparison
+                    Results
                   </Button>
                 </div>
               )}
@@ -633,8 +794,8 @@ Best regards`);
         <CardContent>
           {viewMode === 'weights' && (
           <>
-          <div className="overflow-x-auto">
-            <table className="border-collapse mx-auto">
+          <div className="overflow-x-auto flex justify-center">
+            <table className="border-collapse">
               <thead>
                 <tr className="border-b-2 border-border">
                   <th className="text-center p-3 font-semibold text-foreground bg-background whitespace-nowrap">
@@ -728,7 +889,7 @@ Best regards`);
                           min="0"
                           max="100"
                           step="1"
-                          value={userWeights[currentDomain][paramIndex] ?? ""}
+                          value={userWeights[currentDomain]?.[paramIndex] ?? ""}
                           onChange={(e) => handleUserWeightChange(paramIndex, e.target.value)}
                           className={`w-16 h-8 text-center text-sm font-semibold ${isMeDisabled ? 'opacity-50' : 'border-blue-300 dark:border-blue-700'}`}
                           placeholder="-"
@@ -758,7 +919,7 @@ Best regards`);
                       );
                     })}
                     <td className="text-center p-2 text-foreground text-sm font-semibold bg-primary/5">
-                      {Math.round(calculateFinalWeight(paramIndex))}
+                      {calculateFinalWeight(paramIndex).toFixed(1)}
                     </td>
                   </tr>
                 ))}
@@ -808,7 +969,7 @@ Best regards`);
                     );
                   })}
                   <td className="text-center p-2 text-foreground text-sm font-semibold bg-primary/10">
-                    {Math.round(parameters.reduce((sum, _, paramIndex) => sum + calculateFinalWeight(paramIndex), 0))}
+                    {parameters.reduce((sum, _, paramIndex) => sum + calculateFinalWeight(paramIndex), 0).toFixed(1)}
                   </td>
                 </tr>
               </tbody>
@@ -859,8 +1020,8 @@ Best regards`);
           )}
 
           {viewMode === 'results' && showResultsTable && (
-            <div className="overflow-x-auto">
-              <table className="border-collapse mx-auto">
+            <div className="overflow-x-auto flex justify-center">
+              <table className="border-collapse">
                 <thead>
                   <tr className="border-b-2 border-border">
                     <th className="text-center p-3 font-semibold text-foreground bg-background whitespace-nowrap">
