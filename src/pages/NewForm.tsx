@@ -7,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { ArrowLeft, ArrowRight, CheckCircle2, Zap, Target, Globe, Users, MapPin, FileCheck, Clock, TrendingUp, Brain, UserPlus, Scale, Plus, Minus } from "lucide-react";
 import { toast } from "sonner";
 import { SecondaryCategorySelector } from "@/components/SecondaryCategorySelector";
 import { InlineSheetViewer } from "@/components/InlineSheetViewer";
@@ -67,6 +68,14 @@ const NewForm = () => {
   const navigate = useNavigate();
   const { getButtonClasses, getTextClass, getBgLightClass } = useButtonColor();
 
+  // Temporary state for textarea fields to allow Enter key
+  const [textareaValues, setTextareaValues] = useState({
+    goals: "",
+    users: "",
+    geography: "",
+    compliance: "",
+  });
+
   useEffect(() => {
     const username = getSession()?.username;
     if (!username) return;
@@ -92,12 +101,41 @@ const NewForm = () => {
         }
         if (!parsed.domains) parsed.domains = [];
         setState(parsed);
+        // Update textarea values when draft is loaded
+        setTextareaValues({
+          goals: (parsed.goals || []).join("\n"),
+          users: (parsed.users || []).join("\n"),
+          geography: (parsed.geography || []).join("\n"),
+          compliance: (parsed.compliance || []).join("\n"),
+        });
         toast.success("Draft restored");
       }
     })();
   }, []);
 
-  const progress = (currentStep / 12) * 100;
+  // Listen for reset form event from sidebar
+  useEffect(() => {
+    const handleReset = () => {
+      setState(INITIAL_STATE);
+      setCurrentStep(1);
+      setIsSubmitting(false);
+      setSubmitSuccess(false);
+      setShowWeightsTable(false);
+      setSheetUrl(null);
+      setTextareaValues({
+        goals: "",
+        users: "",
+        geography: "",
+        compliance: "",
+      });
+      toast.success("Form reset - starting fresh");
+    };
+
+    window.addEventListener("resetNewForm", handleReset);
+    return () => window.removeEventListener("resetNewForm", handleReset);
+  }, []);
+
+  const progress = (currentStep / 9) * 100;
 
   const handleNext = () => {
     if (currentStep === 2 && state.domains.length === 0) {
@@ -109,20 +147,33 @@ const NewForm = () => {
       return;
     }
     // Goals optional: allow empty goals
-    if (currentStep === 10 && state.llm.length === 0) {
+    if (currentStep === 7 && state.llm.length === 0) {
       toast.error("Please select at least one LLM");
       return;
     }
-    if (currentStep === 12) {
+    if (currentStep === 9) {
       setShowReview(true);
       return;
     }
-    if (currentStep < 12) setCurrentStep(currentStep + 1);
+    if (currentStep < 9) setCurrentStep(currentStep + 1);
   };
 
   const handleBack = () => {
     if (currentStep > 1) setCurrentStep(currentStep - 1);
   };
+
+  // Initialize textarea values from state when step changes or state is loaded
+  useEffect(() => {
+    // Only update if current step is 4 (Context & Details)
+    if (currentStep === 4) {
+      setTextareaValues({
+        goals: state.goals.join("\n"),
+        users: state.users.join("\n"),
+        geography: state.geography.join("\n"),
+        compliance: state.compliance.join("\n"),
+      });
+    }
+  }, [currentStep]); // Only update when step changes
 
   const handleTextareaChange = (field: keyof XrlState, value: string) => {
     const lines = value.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
@@ -130,6 +181,22 @@ const NewForm = () => {
       (l) => lines.find((orig) => orig.toLowerCase() === l)!
     );
     setState({ ...state, [field]: unique });
+  };
+
+  // Handle textarea input without filtering empty lines immediately
+  const handleTextareaInput = (field: "goals" | "users" | "geography" | "compliance", value: string) => {
+    setTextareaValues((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Process textarea value when user leaves the field
+  const handleTextareaBlur = (field: keyof XrlState, value: string) => {
+    const lines = value.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
+    const unique = Array.from(new Set(lines.map((l) => l.toLowerCase()))).map(
+      (l) => lines.find((orig) => orig.toLowerCase() === l)!
+    );
+    setState({ ...state, [field]: unique });
+    // Update textarea value to reflect processed state
+    setTextareaValues((prev) => ({ ...prev, [field]: unique.join("\n") }));
   };
 
   const validateEmail = (email: string) => {
@@ -165,6 +232,17 @@ const NewForm = () => {
       }),
     }).catch(error => {
       console.error("Failed to send domains to Crunchbase webhook:", error);
+    });
+
+    // Send domains to XRL_DataToPlatform webhook (fire and forget - runs in background)
+    fetch("https://shooky5.app.n8n.cloud/webhook-test/XRL_DataToPlatform", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        domains: state.domains
+      }),
+    }).catch(error => {
+      console.error("Failed to send domains to XRL_DataToPlatform webhook:", error);
     });
 
     // Send main submission in background (fire and forget)
@@ -224,6 +302,9 @@ const NewForm = () => {
     // Store the run ID for opening weights table from anywhere
     localStorage.setItem("xrl:lastSubmittedRunId", savedRun.id);
     
+    // Clear the draft (but keep form state for viewing weights table)
+    localStorage.removeItem("xrl:intake:draft");
+    
     // Show success with action button
     toast.success("Submission completed successfully!", { 
       duration: 10000,
@@ -263,13 +344,39 @@ const NewForm = () => {
   const renderStep = () => {
     switch (currentStep) {
       case 1:
-        return <div className="space-y-4"><Label className="text-[#111111]">Sector (locked to Energy)</Label><Input value="Energy" disabled /></div>;
+        return (
+          <div className="space-y-6 animate-in fade-in duration-500">
+            <p className="text-sm text-muted-foreground mb-4">
+              Select the primary sector for your assessment
+            </p>
+            <div className="relative">
+              <Input 
+                value="Energy" 
+                disabled 
+                className="text-center font-semibold text-lg bg-gradient-to-r from-blue-50 to-purple-50 border-2 cursor-not-allowed"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg pointer-events-none"></div>
+            </div>
+          </div>
+        );
       case 2:
         return (
-          <div className="space-y-4">
-            <Label className="text-[#111111]">Domain(s) - Select 1 to 5 *</Label>
-            <p className="text-sm text-muted-foreground">You can select up to 5 domains. Each will be submitted separately.</p>
-            <div className="space-y-2">
+          <div className="space-y-5 animate-in fade-in duration-500">
+            <div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Choose up to 5 domains for analysis. Each will be submitted separately.
+              </p>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{(state.domains || []).length} selected</span>
+                </div>
+                {(state.domains || []).length >= 5 && (
+                  <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">Maximum reached</span>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto pr-2">
               {[
                 "Oil and Gas",
                 "Fossil Fuels",
@@ -290,21 +397,37 @@ const NewForm = () => {
                 "CleanTech",
                 "Alternative Fuels",
                 "Fusion"
-              ].map(domain => (
-                <div key={domain} className="flex items-center space-x-2">
-                  <Checkbox 
-                    id={domain} 
-                    checked={(state.domains || []).includes(domain)} 
-                    onCheckedChange={() => toggleDomain(domain)} 
-                  />
-                  <Label htmlFor={domain} className="text-[#111111] font-normal">{domain}</Label>
-                </div>
-              ))}
+              ].map(domain => {
+                const isSelected = (state.domains || []).includes(domain);
+                const isDisabled = !isSelected && (state.domains || []).length >= 5;
+                return (
+                  <div
+                    key={domain}
+                    className={`domain-option ${isSelected ? 'selected' : ''} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    onClick={() => !isDisabled && toggleDomain(domain)}
+                  >
+                    <Checkbox 
+                      id={domain} 
+                      checked={isSelected} 
+                      onCheckedChange={() => !isDisabled && toggleDomain(domain)} 
+                      disabled={isDisabled}
+                      className="pointer-events-none"
+                    />
+                    <Label 
+                      htmlFor={domain} 
+                      className="text-[#111111] font-normal cursor-pointer flex-1 ml-2 pointer-events-none"
+                    >
+                      {domain}
+                    </Label>
+                  </div>
+                );
+              })}
             </div>
             {(state.domains || []).length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-4">
+              <div className="flex flex-wrap gap-2 mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                <span className="text-xs font-medium text-blue-700">Selected:</span>
                 {(state.domains || []).map(d => (
-                  <span key={d} className="px-3 py-1 chip rounded-full text-sm">
+                  <span key={d} className="px-3 py-1 bg-white border border-blue-200 rounded-full text-sm font-medium text-blue-900 shadow-sm">
                     {d}
                   </span>
                 ))}
@@ -313,49 +436,348 @@ const NewForm = () => {
           </div>
         );
       case 3:
-        return <div className="space-y-4"><SecondaryCategorySelector value={state.secondary_category} onChange={(secondary_category) => setState({ ...state, secondary_category })} /></div>;
-      case 4:
-        return <div className="space-y-4"><Label className="text-[#111111]">Goals (one per line)</Label><p className="text-sm text-muted-foreground">Optional. Enter one per line.</p><Textarea placeholder="Reduce LCOE by 20%&#10;Reach MRL 7 in 18 months" value={state.goals.join("\n")} onChange={(e) => handleTextareaChange("goals", e.target.value)} rows={8} /></div>;
-      case 5:
-        return <div className="space-y-4"><Label className="text-[#111111]">Primary Users</Label><Textarea placeholder="Utility grid planners&#10;IPPs" value={state.users.join("\n")} onChange={(e) => handleTextareaChange("users", e.target.value)} rows={6} /></div>;
-      case 6:
-        return <div className="space-y-4"><Label className="text-[#111111]">Geography</Label><Textarea placeholder="United States&#10;EU" value={state.geography.join("\n")} onChange={(e) => handleTextareaChange("geography", e.target.value)} rows={6} /></div>;
-      case 7:
-        return <div className="space-y-4"><Label className="text-[#111111]">Compliance</Label><Textarea placeholder="ISO 14040 LCA&#10;EPA permits" value={state.compliance.join("\n")} onChange={(e) => handleTextareaChange("compliance", e.target.value)} rows={6} /></div>;
-      case 8:
-        return <div className="space-y-4"><Label className="text-[#111111]">Time Horizon</Label><div className="grid grid-cols-2 gap-3">{["0–6m", "6–12m", "1–3y", "3+y"].map((o) => <Button key={o} variant={state.time_horizon === o ? "default" : "outline"} onClick={() => setState({ ...state, time_horizon: o })} className={state.time_horizon === o ? `h-16 ${getButtonClasses()}` : "h-16"}>{o}</Button>)}</div></div>;
-      case 9:
-        return <div className="space-y-4"><Label className="text-[#111111]">Risk Posture</Label><div className="grid gap-3">{["Conservative", "Balanced", "Aggressive"].map((o) => <Button key={o} variant={state.risk_posture === o ? "default" : "outline"} onClick={() => setState({ ...state, risk_posture: o })} className={state.risk_posture === o ? `h-16 ${getButtonClasses()}` : "h-16"}>{o}</Button>)}</div></div>;
-      case 10:
-        return <div className="space-y-4"><Label className="text-[#111111]">LLM Selection *</Label><div className="space-y-3">{["ChatGPT", "Gemini", "GROK", "DeepSeek", "Claude", "Mistral"].map((llm) => <div key={llm} className="flex items-center space-x-2"><Checkbox id={llm} checked={state.llm.includes(llm)} onCheckedChange={(c) => setState({ ...state, llm: c ? [...state.llm, llm] : state.llm.filter((l) => l !== llm) })} /><Label htmlFor={llm} className="text-[#111111] font-normal">{llm}</Label></div>)}</div></div>;
-      case 11:
-        return <div className="space-y-4"><Label className="text-[#111111]">Human Participants (0-10)</Label><Input type="number" min={0} max={10} value={state.participants_count} onChange={(e) => { const count = Math.max(0, Math.min(10, parseInt(e.target.value) || 0)); const participants = Array.from({ length: count }, (_, i) => state.participants[i] || { name: "", email: "" }); setState({ ...state, participants_count: count, participants }); }} />{state.participants_count > 0 && <div className="space-y-3 mt-6">{state.participants.map((p, i) => <div key={i} className="grid grid-cols-2 gap-3"><Input placeholder="Full Name" value={p.name} onChange={(e) => { const newP = [...state.participants]; newP[i] = { ...newP[i], name: e.target.value }; setState({ ...state, participants: newP }); }} /><Input placeholder="Email" value={p.email} onChange={(e) => { const newP = [...state.participants]; newP[i] = { ...newP[i], email: e.target.value }; setState({ ...state, participants: newP }); }} /></div>)}</div>}</div>;
-      case 12:
         return (
-          <div className="space-y-6">
-            <div className="space-y-6">
-              <Label className="text-foreground text-lg font-medium">LLM ↔ Human Influence</Label>
-              <p className="text-sm text-muted-foreground">
-                Set the balance between AI model analysis and human expert input
-              </p>
-              <div className="space-y-4">
-                <input 
-                  type="range" 
-                  min={0} 
-                  max={100} 
-                  step={25}
-                  value={state.llm_weight_percent} 
-                  onChange={(e) => setState({ ...state, llm_weight_percent: parseInt(e.target.value) })} 
-                  className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-[color:var(--primary-ghost-hex)] transition-all duration-200"
+          <div className="space-y-5 animate-in fade-in duration-500">
+            <SecondaryCategorySelector value={state.secondary_category} onChange={(secondary_category) => setState({ ...state, secondary_category })} />
+          </div>
+        );
+      case 4:
+        return (
+          <div className="space-y-5 animate-in fade-in duration-500">
+            <p className="text-sm text-muted-foreground mb-4">
+              Define your assessment context. All fields are optional but recommended for better results.
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Goals Section */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="w-5 h-5 text-primary" />
+                  <Label className="text-base font-semibold text-foreground">Goals & Objectives</Label>
+                </div>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Define your key objectives—enter one goal per line.
+                </p>
+                <Textarea 
+                  placeholder="Reduce LCOE by 20%&#10;Reach MRL 7 in 18 months&#10;Secure Series B funding"
+                  value={textareaValues.goals} 
+                  onChange={(e) => handleTextareaInput("goals", e.target.value)} 
+                  onBlur={(e) => handleTextareaBlur("goals", e.target.value)}
+                  rows={6} 
+                  className="modern-textarea font-mono text-sm"
                 />
-                <div className="flex justify-between text-xs text-muted-foreground px-2.5">
-                  {[0,25,50,75,100].map((t) => (
-                    <span key={t} className="inline-block -ml-2 first:ml-0 last:ml-0">{t}%</span>
-                  ))}
+                {state.goals.length > 0 && (
+                  <div className="flex items-center gap-2 text-xs text-green-600 bg-green-50 px-2 py-1.5 rounded">
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>{state.goals.length} goal{state.goals.length > 1 ? 's' : ''}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Users Section */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="w-5 h-5 text-primary" />
+                  <Label className="text-base font-semibold text-foreground">Target Users</Label>
+                </div>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Who are the main users or beneficiaries? Enter one per line.
+                </p>
+                <Textarea 
+                  placeholder="Utility grid planners&#10;IPPs (Independent Power Producers)&#10;Energy consultants"
+                  value={textareaValues.users} 
+                  onChange={(e) => handleTextareaInput("users", e.target.value)} 
+                  onBlur={(e) => handleTextareaBlur("users", e.target.value)}
+                  rows={6} 
+                  className="modern-textarea"
+                />
+                {state.users.length > 0 && (
+                  <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 px-2 py-1.5 rounded">
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>{state.users.length} user type{state.users.length > 1 ? 's' : ''}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Geography Section */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <MapPin className="w-5 h-5 text-primary" />
+                  <Label className="text-base font-semibold text-foreground">Geography</Label>
+                </div>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Target regions or markets. Enter one per line.
+                </p>
+                <Textarea 
+                  placeholder="United States&#10;European Union&#10;Southeast Asia"
+                  value={textareaValues.geography} 
+                  onChange={(e) => handleTextareaInput("geography", e.target.value)} 
+                  onBlur={(e) => handleTextareaBlur("geography", e.target.value)}
+                  rows={6} 
+                  className="modern-textarea"
+                />
+                {state.geography.length > 0 && (
+                  <div className="flex items-center gap-2 text-xs text-purple-600 bg-purple-50 px-2 py-1.5 rounded">
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>{state.geography.length} region{state.geography.length > 1 ? 's' : ''}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Compliance Section */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <FileCheck className="w-5 h-5 text-primary" />
+                  <Label className="text-base font-semibold text-foreground">Compliance</Label>
+                </div>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Regulatory requirements and standards. Enter one per line.
+                </p>
+                <Textarea 
+                  placeholder="ISO 14040 LCA&#10;EPA permits&#10;DOE safety standards"
+                  value={textareaValues.compliance} 
+                  onChange={(e) => handleTextareaInput("compliance", e.target.value)} 
+                  onBlur={(e) => handleTextareaBlur("compliance", e.target.value)}
+                  rows={6} 
+                  className="modern-textarea"
+                />
+                {state.compliance.length > 0 && (
+                  <div className="flex items-center gap-2 text-xs text-orange-600 bg-orange-50 px-2 py-1.5 rounded">
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>{state.compliance.length} standard{state.compliance.length > 1 ? 's' : ''}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      case 5:
+        return (
+          <div className="space-y-5 animate-in fade-in duration-500">
+            <p className="text-sm text-muted-foreground">
+              What is your project timeline or investment horizon?
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {["0–6m", "6–12m", "1–3y", "3+y"].map((o) => (
+                <button
+                  key={o}
+                  onClick={() => setState({ ...state, time_horizon: o })}
+                  className={`selection-button h-20 text-base font-semibold ${state.time_horizon === o ? 'selected' : ''}`}
+                >
+                  <span className="relative z-10">{o}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      case 6:
+        return (
+          <div className="space-y-5 animate-in fade-in duration-500">
+            <p className="text-sm text-muted-foreground">
+              Define your risk tolerance and approach to innovation.
+            </p>
+            <div className="grid gap-3">
+              {["Conservative", "Balanced", "Aggressive"].map((o) => (
+                <button
+                  key={o}
+                  onClick={() => setState({ ...state, risk_posture: o })}
+                  className={`selection-button h-20 text-lg font-semibold ${state.risk_posture === o ? 'selected' : ''}`}
+                >
+                  <span className="relative z-10">{o}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      case 7:
+        return (
+          <div className="space-y-5 animate-in fade-in duration-500">
+            <div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Choose which AI models to include in your analysis.
+              </p>
+              <div className="flex items-center gap-2 text-sm font-medium text-primary mb-4">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{state.llm.length} model{state.llm.length !== 1 ? 's' : ''} selected</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {["ChatGPT", "Gemini", "GROK", "DeepSeek", "Claude", "Mistral"].map((llm) => {
+                const isSelected = state.llm.includes(llm);
+                return (
+                  <div
+                    key={llm}
+                    className={`llm-option ${isSelected ? 'selected' : ''}`}
+                    onClick={() => setState({ ...state, llm: isSelected ? state.llm.filter((l) => l !== llm) : [...state.llm, llm] })}
+                  >
+                    <Checkbox 
+                      id={llm} 
+                      checked={isSelected} 
+                      onCheckedChange={() => setState({ ...state, llm: isSelected ? state.llm.filter((l) => l !== llm) : [...state.llm, llm] })} 
+                      className="pointer-events-none"
+                    />
+                    <Label 
+                      htmlFor={llm} 
+                      className="text-[#111111] font-medium cursor-pointer flex-1 pointer-events-none"
+                    >
+                      {llm}
+                    </Label>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      case 8:
+        return (
+          <div className="space-y-5 animate-in fade-in duration-500">
+            <p className="text-sm text-muted-foreground mb-4">
+              Add expert reviewers to provide human insight alongside AI analysis (up to 5).
+            </p>
+            
+            <div className="flex items-center justify-center gap-6 p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-12 w-12 rounded-full shadow-md hover:shadow-lg transition-shadow disabled:opacity-30"
+                onClick={() => {
+                  if (state.participants_count > 0) {
+                    const count = state.participants_count - 1;
+                    const participants = state.participants.slice(0, count);
+                    setState({ ...state, participants_count: count, participants });
+                  }
+                }}
+                disabled={state.participants_count === 0}
+              >
+                <Minus className="h-5 w-5" />
+              </Button>
+              
+              <div className="flex flex-col items-center gap-1">
+                <div className="text-5xl font-bold text-primary">
+                  {state.participants_count}
+                </div>
+                <div className="text-xs text-muted-foreground font-medium">
+                  {state.participants_count === 1 ? 'Participant' : 'Participants'}
                 </div>
               </div>
-              <div className="influence-card">
-                <p className="influence-value">LLM {state.llm_weight_percent}% / Human {100 - state.llm_weight_percent}%</p>
+              
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-12 w-12 rounded-full shadow-md hover:shadow-lg transition-shadow disabled:opacity-30"
+                onClick={() => {
+                  if (state.participants_count < 5) {
+                    const count = state.participants_count + 1;
+                    const participants = [...state.participants, { name: "", email: "" }];
+                    setState({ ...state, participants_count: count, participants });
+                  }
+                }}
+                disabled={state.participants_count >= 5}
+              >
+                <Plus className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {state.participants_count >= 5 && (
+              <div className="text-center text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
+                Maximum number of participants reached
+              </div>
+            )}
+            
+            {state.participants_count > 0 && (
+              <div className="space-y-3 mt-6">
+                {state.participants.map((p, i) => (
+                  <div key={i} className="participant-input-group">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                        {i + 1}
+                      </div>
+                      <Label className="text-sm font-semibold text-foreground">
+                        Participant {i + 1}
+                      </Label>
+                    </div>
+                    <div className="space-y-2">
+                      <Input 
+                        placeholder="Full Name" 
+                        value={p.name} 
+                        onChange={(e) => { 
+                          const newP = [...state.participants]; 
+                          newP[i] = { ...newP[i], name: e.target.value }; 
+                          setState({ ...state, participants: newP }); 
+                        }} 
+                        className="bg-white"
+                      />
+                      <Input 
+                        placeholder="Email" 
+                        type="email"
+                        value={p.email} 
+                        onChange={(e) => { 
+                          const newP = [...state.participants]; 
+                          newP[i] = { ...newP[i], email: e.target.value }; 
+                          setState({ ...state, participants: newP }); 
+                        }} 
+                        className="bg-white"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      case 9:
+        return (
+          <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="space-y-6">
+              <p className="text-sm text-muted-foreground mb-4">
+                Set the balance between AI model analysis and human expert input.
+              </p>
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="text-sm text-muted-foreground min-w-[80px] text-left">
+                    100% Human<br/>
+                    <span className="text-xs">(0% LLM)</span>
+                  </div>
+                  <Slider
+                    value={[state.llm_weight_percent]}
+                    onValueChange={(value) => setState({ ...state, llm_weight_percent: value[0] })}
+                    min={0}
+                    max={100}
+                    step={25}
+                    className="flex-1"
+                  />
+                  <div className="text-sm text-muted-foreground min-w-[80px] text-right">
+                    100% LLM<br/>
+                    <span className="text-xs">(0% Human)</span>
+                  </div>
+                </div>
+                
+                {/* Marks for slider positions */}
+                <div className="flex justify-between px-[80px] text-xs text-muted-foreground">
+                  <span>0</span>
+                  <span>25</span>
+                  <span>50</span>
+                  <span>75</span>
+                  <span>100</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="influence-card">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <Brain className="w-4 h-4 text-primary" />
+                    <span className="text-xs font-medium text-muted-foreground">AI Models</span>
+                  </div>
+                  <p className="influence-value text-2xl">{state.llm_weight_percent}%</p>
+                </div>
+                <div className="influence-card">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <Users className="w-4 h-4 text-primary" />
+                    <span className="text-xs font-medium text-muted-foreground">Human Experts</span>
+                  </div>
+                  <p className="influence-value text-2xl">{100 - state.llm_weight_percent}%</p>
+                </div>
               </div>
             </div>
             {/* Actions for step 12 are standardized via the sticky footer below, so no top button here */}
@@ -525,6 +947,9 @@ const NewForm = () => {
                     className="transition-all duration-200 hover:shadow-md"
                     size="lg"
                     onClick={() => {
+                      // Clear any saved draft
+                      localStorage.removeItem("xrl:intake:draft");
+                      // Reset all form state
                       setState(INITIAL_STATE);
                       setCurrentStep(1);
                       setIsSubmitting(false);
@@ -558,18 +983,34 @@ const NewForm = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto relative">
-      <div className="mb-4">
-        <div className="flex justify-between mb-2">
-          <p className="text-sm font-medium text-[#111111]">Step {currentStep} of 12</p>
-          <p className="text-sm text-muted-foreground">{Math.round(progress)}%</p>
+    <div className="max-w-[95vw] mx-auto relative">
+      <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border border-border">
+        <div className="flex justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="bg-primary/10 px-3 py-1 rounded-full">
+              <p className="text-sm font-bold text-primary">Step {currentStep} of 9</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-green-500" />
+            <p className="text-sm font-semibold text-foreground">{Math.round(progress)}% Complete</p>
+          </div>
         </div>
-        <Progress value={progress} className="h-2" />
+        <Progress value={progress} className="h-3 shadow-inner" />
       </div>
       <div className="step-card">
         <div className="card-header">
-          <div className="step-title text-[#111111]">
-          {["Sector", "Domain", "Secondary Category", "Goals", "Primary Users", "Geography", "Compliance", "Time Horizon", "Risk Posture", "LLM Selection", "Human Participants", "Influence Balance"][currentStep - 1]}
+          <div className="step-title text-[#111111] flex items-center gap-2">
+            {currentStep === 1 && <Zap className="w-6 h-6 text-primary inline-block" />}
+            {currentStep === 2 && <Target className="w-6 h-6 text-primary inline-block" />}
+            {currentStep === 3 && <MapPin className="w-6 h-6 text-primary inline-block" />}
+            {currentStep === 4 && <Target className="w-6 h-6 text-primary inline-block" />}
+            {currentStep === 5 && <Clock className="w-6 h-6 text-primary inline-block" />}
+            {currentStep === 6 && <TrendingUp className="w-6 h-6 text-primary inline-block" />}
+            {currentStep === 7 && <Brain className="w-6 h-6 text-primary inline-block" />}
+            {currentStep === 8 && <UserPlus className="w-6 h-6 text-primary inline-block" />}
+            {currentStep === 9 && <Scale className="w-6 h-6 text-primary inline-block" />}
+            <span>{["Sector", "Domain", "Secondary Category", "Context & Details", "Time Horizon", "Risk Posture", "LLM Selection", "Human Participants", "Influence Balance"][currentStep - 1]}</span>
           </div>
           <div className="field-hint" />
         </div>
@@ -587,7 +1028,7 @@ const NewForm = () => {
               <ArrowLeft className="h-4 w-4 mr-2" />Back
             </Button>
             <Button onClick={handleNext} className={`flex-1 ${getButtonClasses()}`}>
-              {currentStep === 12 ? "Complete" : (
+              {currentStep === 9 ? "Complete" : (
                 <>
                   Next<ArrowRight className="h-4 w-4 ml-2" />
                 </>

@@ -32,10 +32,32 @@ export const DashboardSidebar = () => {
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
+                  <SidebarMenuButton 
+                    asChild={item.url !== "/dashboard/new-form"} 
+                    isActive={location.pathname === item.url}
+                  >
+                    {item.url === "/dashboard/new-form" ? (
+                      <button
+                        onClick={() => {
+                          // Clear draft before navigating to new form
+                          localStorage.removeItem("xrl:intake:draft");
+                          // Force reload by navigating with state
+                          if (location.pathname === item.url) {
+                            // Already on the page, trigger a custom event to reset form
+                            window.dispatchEvent(new Event("resetNewForm"));
+                          } else {
+                            navigate(item.url);
+                          }
+                        }}
+                        className="text-[#111111] hover:bg-accent w-full text-left"
+                      >
+                        <span>{item.title}</span>
+                      </button>
+                    ) : (
                     <Link to={item.url} className="text-[#111111] hover:bg-accent">
                       <span>{item.title}</span>
                     </Link>
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

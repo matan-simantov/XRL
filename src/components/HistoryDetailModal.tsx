@@ -156,7 +156,7 @@ export function HistoryDetailModal({ open, onOpenChange, entry }: HistoryDetailM
               </div>
             )}
 
-            <div className="text-sm p-4 bg-accent rounded-lg">
+            <div className="text-sm">
               <p className="font-medium text-[#111111]">Influence Balance</p>
               <p className="text-muted-foreground mt-1">
                 LLM {entry.llm_weight_percent || 50}% / Human {100 - (entry.llm_weight_percent || 50)}%

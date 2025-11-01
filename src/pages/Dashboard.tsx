@@ -19,44 +19,44 @@ const Dashboard = () => {
         <main className="flex-1 flex flex-col min-h-screen">
           <Header />
           <div className="flex-1 p-8">
-            {isHome ? (
-              <div className="max-w-4xl mx-auto">
-                <h1 className="text-4xl font-bold text-foreground mb-2">Welcome to XRL</h1>
-                <p className="text-muted-foreground mb-8">Choose an action to get started</p>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Link to="/dashboard/new-form">
-                    <Card className="cursor-pointer hover:shadow-lg transition-shadow h-full">
-                      <CardHeader>
+          {isHome ? (
+            <div className="max-w-4xl mx-auto">
+              <h1 className="text-4xl font-bold text-foreground mb-2">Welcome to XRL</h1>
+              <p className="text-muted-foreground mb-8">Choose an action to get started</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Link to="/dashboard/new-form">
+                  <Card className="cursor-pointer hover:shadow-lg transition-shadow h-full">
+                    <CardHeader>
                         <div className={`w-12 h-12 rounded-lg ${getBgLightClass()} flex items-center justify-center mb-4`}>
                           <FileText className={`h-6 w-6 ${getTextClass()}`} />
-                        </div>
-                        <CardTitle>Start New Form</CardTitle>
-                        <CardDescription>
-                          Begin a new 10-step analysis workflow
-                        </CardDescription>
-                      </CardHeader>
-                    </Card>
-                  </Link>
+                      </div>
+                      <CardTitle>Start New Form</CardTitle>
+                      <CardDescription>
+                        Begin a new 10-step analysis workflow
+                      </CardDescription>
+                    </CardHeader>
+                  </Card>
+                </Link>
 
-                  <Link to="/dashboard/history">
-                    <Card className="cursor-pointer hover:shadow-lg transition-shadow h-full">
-                      <CardHeader>
+                <Link to="/dashboard/history">
+                  <Card className="cursor-pointer hover:shadow-lg transition-shadow h-full">
+                    <CardHeader>
                         <div className={`w-12 h-12 rounded-lg ${getBgLightClass()} flex items-center justify-center mb-4`}>
                           <History className={`h-6 w-6 ${getTextClass()}`} />
-                        </div>
-                        <CardTitle>View History</CardTitle>
-                        <CardDescription>
-                          Review past submissions and results
-                        </CardDescription>
-                      </CardHeader>
-                    </Card>
-                  </Link>
-                </div>
+                      </div>
+                      <CardTitle>View History</CardTitle>
+                      <CardDescription>
+                        Review past submissions and results
+                      </CardDescription>
+                    </CardHeader>
+                  </Card>
+                </Link>
               </div>
-            ) : (
-              <Outlet />
-            )}
+            </div>
+          ) : (
+            <Outlet />
+          )}
           </div>
           <Footer />
         </main>

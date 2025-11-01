@@ -1,13 +1,19 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { X, Mail, ChevronLeft, ChevronRight, RefreshCw, Eye, EyeOff, FileText, CheckCircle } from "lucide-react";
+import { X, Mail, ChevronLeft, ChevronRight, RefreshCw, Eye, EyeOff, FileText, CheckCircle, MoreVertical } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -43,33 +49,71 @@ interface WeightsTableProps {
 }
 
 const parameters = [
-  { short: "Number of IPOs", full: "Number of IPOs in the sector worldwide in the past 5 years" },
-  { short: "Acquisitions/Mergers", full: "Number of companies worldwide that were acquired or merged in the past 5 years" },
-  { short: "Active Companies", full: "Number of active companies in the sector worldwide" },
-  { short: "New Companies", full: "Number of new companies in the past 5 years" },
-  { short: "Pre-Seed & Seed", full: "Number of companies in the sector worldwide that raised Pre-Seed & Seed rounds" },
-  { short: "Series A", full: "Number of companies in the sector worldwide that raised a Series A round" },
-  { short: "Series B–C", full: "Number of companies in the sector worldwide that raised Series B–C rounds" },
-  { short: "Late-Stage Rounds", full: "Number of companies in the sector worldwide that raised late-stage rounds" },
-  { short: "Series A/Seed Ratio", full: "Ratio of companies that raised a Series A round out of those that raised a Seed round in the past 5 years" },
-  { short: "New Blood Flow", full: '"New blood" flow in the sector worldwide (new activities/active activities)' },
-  { short: "Average Company Age", full: "Average age of an active company worldwide" },
+  { short: "IPOs Worldwide", full: "Number of IPOs in the sector worldwide in the past 5 years (2020–2025)" },
+  { short: "M&A Worldwide", full: "Number of companies worldwide that were acquired or merged in the past 5 years (2020–2025)" },
+  { short: "Active Companies Worldwide", full: "Number of active companies in the sector worldwide" },
+  { short: "New Companies Worldwide", full: "Number of new companies in the past 5 years (2020–2025)" },
+  { short: "Pre-Seed & Seed Worldwide", full: "Number of companies in the sector worldwide that raised Pre-Seed & Seed rounds (2020–2025)" },
+  { short: "Series A Worldwide", full: "Number of companies in the sector worldwide that raised a Series A round (2020–2025)" },
+  { short: "Series B–C Worldwide", full: "Number of companies in the sector worldwide that raised Series B–C rounds (2020–2025)" },
+  { short: "Late-Stage Worldwide", full: "Number of companies in the sector worldwide that raised late-stage rounds (2020–2025)" },
+  { short: "Series A/Seed Ratio Worldwide", full: "Ratio of companies that raised a Series A round out of those that raised a Seed round in the past 5 years (2020–2025)" },
+  { short: "New Blood Flow Worldwide", full: '"New blood" flow in the sector worldwide (new activities/active activities) (2020–2025)' },
+  { short: "Avg Company Age Worldwide", full: "Average age of an active company worldwide" },
+  { short: "Total Capital Raised", full: "Total capital raised ($) (2020–2025)" },
+  { short: "Capital: Pre-Seed & Seed", full: "Total capital raised in Pre-Seed & Seed rounds ($) (2020–2025)" },
+  { short: "Capital: Series A", full: "Total capital raised in Series A rounds ($) (2020–2025)" },
+  { short: "Capital: Series B–C", full: "Total capital raised in Series B–C rounds ($) (2020–2025)" },
+  { short: "Capital: Series D–J", full: "Total capital raised in Series D–J rounds ($) (2020–2025)" },
+  { short: "Avg IPO Amount", full: "Average IPO amount ($) for companies that went public between 2020–2025" },
+  { short: "Incubators", full: "Number of incubators in the sector" },
+  { short: "Private Accelerators", full: "Number of private accelerators in the sector" },
+  { short: "Communities", full: "Number of communities in the sector" },
+  { short: "Employees in Sector", full: "Number of employees in the sector" },
+  { short: "Training Programs", full: "Number of professional non-academic training programs and entrepreneurship support frameworks" },
+  { short: "Active Companies Israel", full: "Number of active companies in the sector in Israel" },
+  { short: "New Companies Israel", full: "Number of new companies in the past 5 years (2019–2025)" },
+  { short: "Seed Rounds Israel", full: "Number of companies in the sector in Israel that raised Seed rounds (2020–2025)" },
+  { short: "Series A Israel", full: "Number of companies in the sector in Israel that raised a Series A round (2019–2025)" },
+  { short: "Series B–C Israel", full: "Number of companies in the sector in Israel that raised Series B–C rounds (2020–2025)" },
+  { short: "Late-Stage Israel", full: "Number of companies in the sector in Israel that raised late-stage rounds (2020–2025)" },
+  { short: "% Change in Funding Israel", full: "% change in the number of companies that raised funding in the sector in the past 5 years (2019–2025 compared to 2014–2018)" },
+  { short: "Avg Company Age Israel", full: "Average age of an active company (years)" },
+  { short: "Revenue Stage Israel", full: "Number of active companies in Israel that reached the revenue growth stage (sales stage)" },
+  { short: "M&A Israel", full: "Number of companies acquired or merged in the past 5 years (2020–2025)" },
+  { short: "IPOs Israel", full: "Number of IPOs in the past 5 years (2020–2025)" },
+  { short: "Acquiring Companies Israel", full: "Number of acquiring companies in the past 5 years (2020–2025)" },
+  { short: "Series A/Pre-Seed Ratio Israel", full: "Ratio of companies that raised a Series A round out of those that raised a Seed or Pre-Seed round in the past 5 years (2020–2025)" },
+  { short: "New Blood Flow Israel", full: '"New blood" flow into the sector (new active companies ÷ active companies) (2020–2025)' },
+  { short: "Multinationals Israel", full: "Number of multinationals in the sector in Israel" },
 ];
+
+// Active parameter indices (1-7, 9, 11) - indices 0-6, 8, 10
+const ACTIVE_PARAMETER_INDICES = [0, 1, 2, 3, 4, 5, 6, 8, 10];
 
 // Generate weights that sum to 100 for a column with relatively close values
 const generateWeightsForColumn = (): number[] => {
-  // Generate 11 random numbers between 0.5 and 1.5 (more uniform distribution)
-  const random = Array.from({ length: 11 }, () => 0.5 + Math.random());
+  // Initialize all weights to null
+  const weights = Array.from({ length: parameters.length }, () => null as number | null);
+  
+  // Generate random numbers only for active parameters (between 0.5 and 1.5)
+  const random = ACTIVE_PARAMETER_INDICES.map(() => 0.5 + Math.random());
   const sum = random.reduce((a, b) => a + b, 0);
   
   // Normalize to sum to 100 and round to integers
-  const normalized = random.map(r => Math.round((r / sum) * 100));
+  const normalized = random.map(r => Math.max(0, Math.round((r / sum) * 100)));
   
-  // Adjust the last value to ensure exact sum of 100
+  // Adjust the last active parameter to ensure exact sum of 100
   const currentSum = normalized.slice(0, -1).reduce((a, b) => a + b, 0);
-  normalized[10] = 100 - currentSum;
+  const lastValue = 100 - currentSum;
+  normalized[normalized.length - 1] = Math.max(0, lastValue);
   
-  return normalized;
+  // Assign weights only to active parameters
+  ACTIVE_PARAMETER_INDICES.forEach((paramIndex, i) => {
+    weights[paramIndex] = normalized[i];
+  });
+  
+  return weights as number[];
 };
 
 export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 50, formData, onClose }: WeightsTableProps) => {
@@ -137,6 +181,9 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
 
   // User's custom weights for each domain - will be initialized in useEffect
   const [userWeights, setUserWeights] = useState<Record<string, Record<number, number | null>>>({});
+  
+  // Store initial weights (IIA defaults) for reset functionality
+  const [initialUserWeights, setInitialUserWeights] = useState<Record<string, Record<number, number | null>>>({});
 
   const currentDomain = domains[currentDomainIndex] || domains[0] || "";
   const data = allDomainsData[currentDomain] || {};
@@ -153,6 +200,8 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
       
       if (savedState.userWeights) {
         setUserWeights(savedState.userWeights);
+        // Save initial weights for IIA reset
+        setInitialUserWeights(savedState.userWeights);
       } else {
         // Calculate initial userWeights from allDomainsData
         const initUserWeights = () => {
@@ -160,10 +209,14 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
           
           domains.forEach((domain) => {
             weights[domain] = {};
-            
-            // First pass: calculate all averages
-            const averages: number[] = [];
+            // Initialize all to null first
             parameters.forEach((_, paramIndex) => {
+              weights[domain][paramIndex] = null;
+            });
+            
+            // First pass: calculate averages only for active parameters
+            const averages: number[] = [];
+            ACTIVE_PARAMETER_INDICES.forEach((paramIndex) => {
               // Calculate average of LLMs for this parameter
               let llmSum = 0;
               let llmCount = 0;
@@ -180,21 +233,18 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
               averages.push(llmAvg);
             });
             
-            // Second pass: normalize to sum to 100
+            // Second pass: normalize to sum to 100 (only active parameters)
             const sum = averages.reduce((a, b) => a + b, 0);
             if (sum > 0) {
               const normalized = averages.map(v => Math.round((v / sum) * 100));
               
-              // Adjust the last value to ensure exact sum of 100
+              // Adjust the last active parameter to ensure exact sum of 100
               const currentSum = normalized.slice(0, -1).reduce((a, b) => a + b, 0);
               normalized[normalized.length - 1] = 100 - currentSum;
               
-              parameters.forEach((_, paramIndex) => {
-                weights[domain][paramIndex] = normalized[paramIndex];
-              });
-            } else {
-              parameters.forEach((_, paramIndex) => {
-                weights[domain][paramIndex] = null;
+              // Assign weights only to active parameters
+              ACTIVE_PARAMETER_INDICES.forEach((paramIndex, i) => {
+                weights[domain][paramIndex] = normalized[i];
               });
             }
           });
@@ -202,7 +252,10 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
           return weights;
         };
         
-        setUserWeights(initUserWeights());
+        const initWeights = initUserWeights();
+        setUserWeights(initWeights);
+        // Save initial weights for IIA reset
+        setInitialUserWeights(initWeights);
       }
       
       if (savedState.resultData) {
@@ -245,9 +298,14 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
         
         domains.forEach((domain) => {
           weights[domain] = {};
-          
-          const averages: number[] = [];
+          // Initialize all to null first
           parameters.forEach((_, paramIndex) => {
+            weights[domain][paramIndex] = null;
+          });
+          
+          // Calculate averages only for active parameters
+          const averages: number[] = [];
+          ACTIVE_PARAMETER_INDICES.forEach((paramIndex) => {
             let llmSum = 0;
             let llmCount = 0;
             
@@ -269,12 +327,9 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
             const currentSum = normalized.slice(0, -1).reduce((a, b) => a + b, 0);
             normalized[normalized.length - 1] = 100 - currentSum;
             
-            parameters.forEach((_, paramIndex) => {
-              weights[domain][paramIndex] = normalized[paramIndex];
-            });
-          } else {
-            parameters.forEach((_, paramIndex) => {
-              weights[domain][paramIndex] = null;
+            // Assign weights only to active parameters
+            ACTIVE_PARAMETER_INDICES.forEach((paramIndex, i) => {
+              weights[domain][paramIndex] = normalized[i];
             });
           }
         });
@@ -290,8 +345,98 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
       setShowResultsTable(false);
       setResultData({});
       setViewMode('weights');
+      
+      // Save initial weights for IIA reset
+      setInitialUserWeights(initUserWeights());
     }
   }, [formData?.id, llms.length, participants.length, domains.length]); // Re-run when data structure changes
+
+  // Function to set equal weights (Equal distribution)
+  const handleEqualWeights = () => {
+    // Calculate equal weight per active parameter (with one decimal place)
+    const activeParamsCount = ACTIVE_PARAMETER_INDICES.length;
+    const equalWeightPerParam = Math.round((100 / activeParamsCount) * 10) / 10;
+    const totalFromEqual = equalWeightPerParam * activeParamsCount;
+    const remainder = Math.round((100 - totalFromEqual) * 10) / 10;
+    
+    setUserWeights((prevWeights) => {
+      const newWeights = { ...prevWeights };
+      
+      domains.forEach((domain) => {
+        newWeights[domain] = {};
+        // Initialize all to null first
+        parameters.forEach((_, paramIndex) => {
+          newWeights[domain][paramIndex] = null;
+        });
+        
+        // Set equal weights only for active parameters
+        ACTIVE_PARAMETER_INDICES.forEach((paramIndex, i) => {
+          // Last active parameter gets the remainder to ensure sum is exactly 100.0
+          if (i === ACTIVE_PARAMETER_INDICES.length - 1) {
+            newWeights[domain][paramIndex] = Math.round((equalWeightPerParam + remainder) * 10) / 10;
+          } else {
+            newWeights[domain][paramIndex] = equalWeightPerParam;
+          }
+        });
+      });
+      
+      return newWeights;
+    });
+  };
+
+  // Function to reset to initial weights (IIA defaults)
+  const handleResetToIIA = () => {
+    if (Object.keys(initialUserWeights).length > 0) {
+      setUserWeights(JSON.parse(JSON.stringify(initialUserWeights)));
+    } else {
+      // Recalculate initial weights if not saved
+      const recalcWeights = () => {
+        const weights: Record<string, Record<number, number | null>> = {};
+        
+        domains.forEach((domain) => {
+          weights[domain] = {};
+          // Initialize all to null first
+          parameters.forEach((_, paramIndex) => {
+            weights[domain][paramIndex] = null;
+          });
+          
+          // Calculate averages only for active parameters
+          const averages: number[] = [];
+          ACTIVE_PARAMETER_INDICES.forEach((paramIndex) => {
+            let llmSum = 0;
+            let llmCount = 0;
+            
+            llms.forEach((llm) => {
+              const value = allDomainsData[domain]?.[paramIndex]?.[llm];
+              if (value !== null && value !== undefined) {
+                llmSum += value;
+                llmCount++;
+              }
+            });
+            
+            const llmAvg = llmCount > 0 ? llmSum / llmCount : 0;
+            averages.push(llmAvg);
+          });
+          
+          const sum = averages.reduce((a, b) => a + b, 0);
+          if (sum > 0) {
+            const normalized = averages.map(v => Math.round((v / sum) * 100));
+            const currentSum = normalized.slice(0, -1).reduce((a, b) => a + b, 0);
+            normalized[normalized.length - 1] = 100 - currentSum;
+            
+            // Assign weights only to active parameters
+            ACTIVE_PARAMETER_INDICES.forEach((paramIndex, i) => {
+              weights[domain][paramIndex] = normalized[i];
+            });
+          }
+        });
+        
+        return weights;
+      };
+      
+      setUserWeights(recalcWeights());
+    }
+  };
 
   // Auto-save table state to localStorage whenever it changes
   useEffect(() => {
@@ -405,7 +550,19 @@ Best regards`);
 
   // Handle user weight change
   const handleUserWeightChange = (paramIndex: number, value: string) => {
-    const numValue = value === "" ? null : parseInt(value);
+    // Only allow changes for active parameters
+    if (!ACTIVE_PARAMETER_INDICES.includes(paramIndex)) {
+      return;
+    }
+    
+    // Parse as float to support decimals, clamp between 0 and 100
+    let numValue: number | null = null;
+    if (value !== "" && value !== "-" && value !== ".") {
+      const parsed = parseFloat(value);
+      if (!isNaN(parsed)) {
+        numValue = Math.max(0, Math.min(100, Math.round(parsed * 10) / 10)); // Round to 1 decimal place
+      }
+    }
     setUserWeights((prev) => ({
       ...prev,
       [currentDomain]: {
@@ -415,10 +572,10 @@ Best regards`);
     }));
   };
 
-  // Calculate user's total for validation
+  // Calculate user's total for validation (only active parameters)
   const calculateUserTotal = (): number => {
     if (!userWeights[currentDomain]) return 0;
-    return parameters.reduce((sum, _, paramIndex) => {
+    return ACTIVE_PARAMETER_INDICES.reduce((sum, paramIndex) => {
       const value = userWeights[currentDomain][paramIndex];
       return sum + (value || 0);
     }, 0);
@@ -514,9 +671,9 @@ Best regards`);
   const handleConfirmWeights = () => {
     // Check if Me column sum is 100
     const meTotal = calculateUserTotal();
-    if (meTotal !== 100 && meTotal > 0) {
+    if (Math.abs(meTotal - 100) > 0.05 && meTotal > 0) { // Allow small rounding differences
       toast.error("YOU column total must equal 100", {
-        description: `Current total: ${Math.round(meTotal)}. Please adjust your weights.`,
+        description: `Current total: ${meTotal.toFixed(1)}. Please adjust your weights.`,
       });
       return;
     }
@@ -598,7 +755,8 @@ Best regards`);
   };
 
   // Generate realistic result data for all domains based on parameter types
-  const handleFinalConfirm = () => {
+  // Function to generate dummy results (fallback)
+  const generateDummyResults = (): Record<string, Record<number, number>> => {
     const results: Record<string, Record<number, number>> = {};
     
     domains.forEach((domain) => {
@@ -608,7 +766,8 @@ Best regards`);
       const domainSeed = domain.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
       const domainMultiplier = 0.8 + (domainSeed % 40) / 100; // 0.8 to 1.2
       
-      parameters.forEach((_, paramIndex) => {
+      // Generate results only for active parameters
+      ACTIVE_PARAMETER_INDICES.forEach((paramIndex) => {
         // Get the final weight for this domain and parameter
         const finalWeight = calculateFinalWeightForDomain(domain, paramIndex);
         const weightInfluence = finalWeight / 10; // 0-10 range
@@ -637,19 +796,14 @@ Best regards`);
           case 6: // Series B-C (baseline: 380)
             result = Math.round((250 + weightInfluence * 50 + Math.random() * 180) * domainMultiplier);
             break;
-          case 7: // Late-Stage Rounds (baseline: 160)
-            result = Math.round((100 + weightInfluence * 30 + Math.random() * 80) * domainMultiplier);
-            break;
           case 8: // Series A/Seed Ratio (baseline: ~54%)
             result = parseFloat((45 + weightInfluence * 3 + Math.random() * 15).toFixed(1));
-            break;
-          case 9: // New Blood Flow (baseline: ~28%)
-            result = parseFloat((0.20 + weightInfluence * 0.03 + Math.random() * 0.12).toFixed(2));
             break;
           case 10: // Average Company Age (baseline: ~7.5 years)
             result = parseFloat((6 + weightInfluence * 0.5 + Math.random() * 2.5).toFixed(1));
             break;
           default:
+            // Should not happen for active parameters, but safety fallback
             result = 0;
         }
         
@@ -657,14 +811,52 @@ Best regards`);
       });
     });
     
-    setResultData(results);
-    setShowResultsTable(true);
-    setViewMode('results'); // Navigate to results view automatically
+    return results;
+  };
+
+  const handleFinalConfirm = async () => {
     setShowConfirmDialog(false);
     
-    toast.success("Results generated successfully!", {
-      description: "Viewing comparison results across all domains.",
-    });
+    // Try to fetch results from n8n
+    const runId = formData?.id?.toString();
+    let n8nData: Record<string, Record<number, number>> | null = null;
+    
+    if (runId) {
+      try {
+        // Fetch data from n8n (you may need to adjust this URL based on your n8n setup)
+        const response = await fetch(`https://shooky5.app.n8n.cloud/webhook-test/XRL_DataToPlatform?runId=${runId}`);
+        if (response.ok) {
+          const data = await response.json();
+          // Check if data has results structure
+          if (data && data.results) {
+            n8nData = data.results;
+          } else if (data && typeof data === 'object') {
+            // If data is already in the correct format
+            n8nData = data;
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch data from n8n:", error);
+      }
+    }
+    
+    // If no data from n8n, show warning and use dummy data
+    if (!n8nData) {
+      toast.warning("No data received from n8n", {
+        description: "Displaying dummy data. Real data will be available once n8n processing is complete.",
+        duration: 5000,
+      });
+      n8nData = generateDummyResults();
+    } else {
+      toast.success("Real data loaded from n8n", {
+        description: "Displaying actual results from n8n processing.",
+        duration: 3000,
+      });
+    }
+    
+    setResultData(n8nData);
+    setShowResultsTable(true);
+    setViewMode('results');
   };
 
   // Don't render if essential data is not loaded yet
@@ -803,7 +995,29 @@ Best regards`);
                   </th>
                   <th className={`text-center p-2 font-semibold whitespace-nowrap ${isMeDisabled ? 'text-muted-foreground bg-muted/30' : 'text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-950'}`}>
                     <div className="flex flex-col items-center gap-1">
-                      <span className="font-bold">YOU</span>
+                      <div className="flex items-center gap-1">
+                        <span className="font-bold">YOU</span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreVertical className="h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem onClick={handleEqualWeights}>
+                              <span className="text-sm">Equal</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleResetToIIA}>
+                              <span className="text-sm">IIA</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -876,8 +1090,8 @@ Best regards`);
                               {param.short}
                             </span>
                           </TooltipTrigger>
-                          <TooltipContent side="right" className="max-w-xs">
-                            <p>{param.full}</p>
+                          <TooltipContent side="right" className="max-w-md">
+                            <p className="break-words">{param.full}</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -888,12 +1102,12 @@ Best regards`);
                           type="number"
                           min="0"
                           max="100"
-                          step="1"
-                          value={userWeights[currentDomain]?.[paramIndex] ?? ""}
+                          step="0.1"
+                          value={userWeights[currentDomain]?.[paramIndex] !== null && userWeights[currentDomain]?.[paramIndex] !== undefined ? userWeights[currentDomain][paramIndex]!.toFixed(1) : ""}
                           onChange={(e) => handleUserWeightChange(paramIndex, e.target.value)}
-                          className={`w-16 h-8 text-center text-sm font-semibold ${isMeDisabled ? 'opacity-50' : 'border-blue-300 dark:border-blue-700'}`}
+                          className={`w-20 h-8 text-center text-sm font-semibold ${isMeDisabled ? 'opacity-50' : 'border-blue-300 dark:border-blue-700'} ${!ACTIVE_PARAMETER_INDICES.includes(paramIndex) ? 'opacity-50 cursor-not-allowed' : ''}`}
                           placeholder="-"
-                          disabled={isMeDisabled}
+                          disabled={isMeDisabled || !ACTIVE_PARAMETER_INDICES.includes(paramIndex)}
                         />
                       </div>
                     </td>
@@ -934,8 +1148,8 @@ Best regards`);
                       ? "text-red-600 dark:text-red-400"
                       : ""
                   }`}>
-                    {Math.round(calculateUserTotal())}
-                    {!isMeDisabled && calculateUserTotal() !== 100 && calculateUserTotal() > 0 && (
+                    {calculateUserTotal().toFixed(1)}
+                    {!isMeDisabled && Math.abs(calculateUserTotal() - 100) > 0.05 && calculateUserTotal() > 0 && (
                       <span className="text-xs ml-1">(!)</span>
                     )}
                   </td>
@@ -1035,40 +1249,43 @@ Best regards`);
                   </tr>
                 </thead>
                 <tbody>
-                  {parameters.map((param, paramIndex) => (
-                    <tr key={paramIndex} className="border-b border-border hover:bg-accent/50 transition-colors">
-                      <td className="p-2 bg-background text-center whitespace-nowrap">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="font-medium text-foreground cursor-help text-sm">
-                                {param.short}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="right" className="max-w-xs">
-                              <p>{param.full}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </td>
-                      {domains.map((domain, domainIdx) => {
-                        const value = resultData[domain]?.[paramIndex];
-                        return (
-                          <td key={domainIdx} className="text-center p-2 text-foreground text-sm font-semibold bg-green-50 dark:bg-green-950/30">
-                            {(() => {
-                              if (value === undefined || value === null) return "-";
-                              
-                              // Format based on parameter type
-                              if (paramIndex === 8) return `${value}%`; // Ratio percentage
-                              if (paramIndex === 9) return value.toFixed(2); // New Blood Flow (decimal)
-                              if (paramIndex === 10) return `${value} yrs`; // Average age in years
-                              return Math.round(value).toString(); // Whole numbers for counts
-                            })()}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
+                  {ACTIVE_PARAMETER_INDICES.map((paramIndex) => {
+                    const param = parameters[paramIndex];
+                    return (
+                      <tr key={paramIndex} className="border-b border-border hover:bg-accent/50 transition-colors">
+                        <td className="p-2 bg-background text-center whitespace-nowrap">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="font-medium text-foreground cursor-help text-sm">
+                                  {param.short}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="right" className="max-w-md">
+                                <p className="break-words">{param.full}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </td>
+                        {domains.map((domain, domainIdx) => {
+                          const value = resultData[domain]?.[paramIndex];
+                          return (
+                            <td key={domainIdx} className="text-center p-2 text-foreground text-sm font-semibold bg-green-50 dark:bg-green-950/30">
+                              {(() => {
+                                if (value === undefined || value === null) return "-";
+                                
+                                // Format based on parameter type
+                                if (paramIndex === 8) return `${value}%`; // Ratio percentage
+                                if (paramIndex === 9) return value.toFixed(2); // New Blood Flow (decimal)
+                                if (paramIndex === 10) return `${value} yrs`; // Average age in years
+                                return Math.round(value).toString(); // Whole numbers for counts
+                              })()}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
