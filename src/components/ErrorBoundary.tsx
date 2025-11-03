@@ -21,6 +21,13 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("Error caught by boundary:", error, errorInfo)
+    
+    // Try to reset error state after a delay
+    setTimeout(() => {
+      if (this.state.hasError) {
+        this.setState({ hasError: false, error: undefined })
+      }
+    }, 5000)
   }
 
   render() {

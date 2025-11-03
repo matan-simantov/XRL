@@ -145,18 +145,31 @@ export const useThemeColor = () => {
       root.style.setProperty("--dark-ring", palette.ring);
     };
 
-    // Get initial color from localStorage
-    const savedColor = localStorage.getItem("xrl:buttonColor") || "blue";
-    updateThemeColors(savedColor);
+    // Get initial color from localStorage (with error handling)
+    try {
+      const savedColor = typeof window !== "undefined" && localStorage 
+        ? (localStorage.getItem("xrl:buttonColor") || "blue")
+        : "blue";
+      updateThemeColors(savedColor);
+    } catch (error) {
+      console.warn("Failed to read theme color from localStorage:", error);
+      updateThemeColors("blue");
+    }
 
     // Listen for color changes
     const handleColorChange = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      updateThemeColors(customEvent.detail || "blue");
+      try {
+        const customEvent = e as CustomEvent;
+        updateThemeColors(customEvent.detail || "blue");
+      } catch (error) {
+        console.warn("Failed to handle color change:", error);
+      }
     };
 
-    window.addEventListener("colorChange", handleColorChange);
-    return () => window.removeEventListener("colorChange", handleColorChange);
+    if (typeof window !== "undefined") {
+      window.addEventListener("colorChange", handleColorChange);
+      return () => window.removeEventListener("colorChange", handleColorChange);
+    }
   }, []);
 
   return null;

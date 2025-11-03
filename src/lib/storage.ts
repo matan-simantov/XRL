@@ -106,17 +106,25 @@ export async function updateLastLogin(username: string): Promise<void> {
 }
 
 export function setSession(username: string) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ username, at: new Date().toISOString() }));
+  try {
+    if (typeof window !== "undefined" && localStorage) {
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ username, at: new Date().toISOString() }));
+    }
+  } catch (error) {
+    console.warn("Failed to set session:", error);
+  }
 }
 
 export function getSession(): { username: string } | null {
   try {
+    if (typeof window === "undefined" || !localStorage) return null;
     const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed.username === "string") return { username: parsed.username };
     return null;
-  } catch {
+  } catch (error) {
+    console.warn("Failed to get session:", error);
     return null;
   }
 }
