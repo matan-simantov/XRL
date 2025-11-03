@@ -1,8 +1,14 @@
 const API = import.meta.env.VITE_API_URL || "https://xrl.onrender.com"
 
 export async function ping() {
-  const r = await fetch(`${API}/api/health`)
-  return r.json()
+  try {
+    const r = await fetch(`${API}/api/health`)
+    if (!r.ok) throw new Error("Health check failed")
+    return r.json()
+  } catch (error) {
+    console.warn("Backend health check failed (this is okay if backend is not yet deployed):", error)
+    return { status: "error", message: "Backend unavailable" }
+  }
 }
 
 export async function sendToN8n(payload: any) {

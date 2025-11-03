@@ -15,18 +15,29 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { ping } from "@/lib/api";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App = () => {
   useThemeColor(); // Initialize theme colors
   
   useEffect(() => {
+    // Non-blocking ping - don't let it crash the app
     ping()
       .then((data) => {
-        console.log("Backend connection successful:", data);
+        if (data.status !== "error") {
+          console.log("Backend connection successful:", data);
+        }
       })
       .catch((error) => {
-        console.error("Backend connection failed:", error);
+        // Silently fail - backend might not be available yet
+        console.warn("Backend connection check:", error.message);
       });
   }, []);
   
