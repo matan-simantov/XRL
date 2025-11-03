@@ -51,16 +51,17 @@ export const DashboardSidebar = () => {
                   <SidebarMenuButton 
                     asChild={item.url !== "/dashboard/new-form"} 
                     isActive={location.pathname === item.url}
+                    className="hover:bg-accent/30 data-[active=true]:bg-accent/30"
                   >
                     {item.url === "/dashboard/new-form" ? (
                       <button
                         onClick={handleNewForm}
-                        className="text-[#111111] hover:bg-accent w-full text-left"
+                        className="text-[#111111] hover:bg-accent/30 w-full text-left transition-colors"
                       >
                         <span>{item.title}</span>
                       </button>
                     ) : (
-                    <Link to={item.url} className="text-[#111111] hover:bg-accent">
+                    <Link to={item.url} className="text-[#111111] hover:bg-accent/30 transition-colors">
                       <span>{item.title}</span>
                     </Link>
                     )}
@@ -74,7 +75,7 @@ export const DashboardSidebar = () => {
       <SidebarFooter className="border-t border-border">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
+            <SidebarMenuButton asChild className="hover:bg-accent/30">
               <button
                 onClick={() => {
                   try {
@@ -88,7 +89,7 @@ export const DashboardSidebar = () => {
                   } catch {}
                   navigate("/auth");
                 }}
-                className="text-[#111111] hover:bg-accent w-full text-left"
+                className="text-[#111111] hover:bg-accent/30 w-full text-left transition-colors"
               >
                 <span>🚪 Logout</span>
               </button>

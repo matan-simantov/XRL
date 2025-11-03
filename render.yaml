@@ -2,8 +2,9 @@ services:
   - type: web
     name: xrl-frontend
     env: static
-    buildCommand: npm install && npm run build
-    staticPublishPath: ./dist
+    plan: free
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
     headers:
       - path: /*
         name: X-Frame-Options
@@ -14,6 +15,9 @@ services:
       - path: /*
         name: X-XSS-Protection
         value: 1; mode=block
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
     routes:
       - type: rewrite
         source: /*

@@ -51,8 +51,13 @@ const Auth = () => {
     }
     await updateLastLogin(user.username);
     setSession(user.username);
-    toast.success("Signed in successfully!");
-    navigate("/dashboard", { replace: true });
+    toast.success("Signed in successfully!", {
+      duration: 2000,
+    });
+    // Use setTimeout to ensure session is set before navigation
+    setTimeout(() => {
+      navigate("/dashboard", { replace: true });
+    }, 100);
     setIsSubmitting(false);
   };
 
@@ -75,8 +80,13 @@ const Auth = () => {
       const passwordHash = await hashPassword(password);
       await createUser({ username, email, passwordHash } as any);
       setSession(username);
-      toast.success("Account created successfully!");
-      navigate("/dashboard", { replace: true });
+      toast.success("Account created successfully!", {
+        duration: 2000,
+      });
+      // Use setTimeout to ensure session is set before navigation
+      setTimeout(() => {
+        navigate("/dashboard", { replace: true });
+      }, 100);
     } catch (e: any) {
       if (e?.message === "USERNAME_TAKEN") {
         setAuthError("Username already registered.");

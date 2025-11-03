@@ -39,6 +39,7 @@ import { useButtonColor } from "@/hooks/use-button-color";
 import { getColorClasses } from "@/hooks/use-theme-color";
 import { toast } from "sonner";
 import { updateRunTableState, getSession } from "@/lib/storage";
+import { fetchResultsFromN8n } from "@/lib/api";
 
 interface WeightsTableProps {
   llms: string[];
@@ -1169,17 +1170,14 @@ Best regards`);
     
     if (runId) {
       try {
-        // Fetch data from n8n (you may need to adjust this URL based on your n8n setup)
-        const response = await fetch(`https://shooky5.app.n8n.cloud/webhook-test/XRL_DataToPlatform?runId=${runId}`);
-        if (response.ok) {
-          const data = await response.json();
-          // Check if data has results structure
-          if (data && data.results) {
-            n8nData = data.results;
-          } else if (data && typeof data === 'object') {
-            // If data is already in the correct format
-            n8nData = data;
-          }
+        // Fetch data from n8n via backend proxy
+        const data = await fetchResultsFromN8n(runId);
+        // Check if data has results structure
+        if (data && data.results) {
+          n8nData = data.results;
+        } else if (data && typeof data === 'object') {
+          // If data is already in the correct format
+          n8nData = data;
         }
       } catch (error) {
         console.error("Failed to fetch data from n8n:", error);

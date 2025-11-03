@@ -15,6 +15,7 @@ import { InlineSheetViewer } from "@/components/InlineSheetViewer";
 import { WeightsTable } from "@/components/WeightsTable";
 import { getSession, saveDraft, commitRun } from "@/lib/storage";
 import { useButtonColor } from "@/hooks/use-button-color";
+import { sendToN8n, sendToCrunchbase, sendToXRLDataToPlatform } from "@/lib/api";
 
 type XrlState = {
   sector: string;
@@ -235,23 +236,15 @@ const NewForm = () => {
     setIsSubmitting(true);
 
     // Send domains to Crunchbase webhook (fire and forget - runs in background)
-    fetch("https://shooky5.app.n8n.cloud/webhook/xrl-crunchbase-input", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        domains: state.domains
-      }),
+    sendToCrunchbase({
+      domains: state.domains
     }).catch(error => {
       console.error("Failed to send domains to Crunchbase webhook:", error);
     });
 
     // Send domains to XRL_DataToPlatform webhook (fire and forget - runs in background)
-    fetch("https://shooky5.app.n8n.cloud/webhook-test/XRL_DataToPlatform", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        domains: state.domains
-      }),
+    sendToXRLDataToPlatform({
+      domains: state.domains
     }).catch(error => {
       console.error("Failed to send domains to XRL_DataToPlatform webhook:", error);
     });
@@ -274,11 +267,7 @@ const NewForm = () => {
         llm_weight_percent: state.llm_weight_percent,
       };
 
-      fetch("https://shooky5.app.n8n.cloud/webhook/xrl", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }).catch(error => {
+      sendToN8n(payload).catch(error => {
         console.error("Failed to send to n8n webhook:", error);
       });
     });
@@ -922,7 +911,7 @@ const NewForm = () => {
     const displaySheetUrl = sheetUrl || defaultSheetUrl;
 
     return (
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-[95vw] mx-auto">
         <div className="step-card">
           <div className="step-title text-[#111111]">
             {isSubmitting ? "Processing Submission..." : "Submission Complete"}

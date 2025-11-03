@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,13 +11,24 @@ import NewForm from "./pages/NewForm";
 import History from "./pages/History";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
-import { getSession } from "@/lib/storage";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { ping } from "@/lib/api";
 
 const queryClient = new QueryClient();
 
 const App = () => {
   useThemeColor(); // Initialize theme colors
+  
+  useEffect(() => {
+    ping()
+      .then((data) => {
+        console.log("Backend connection successful:", data);
+      })
+      .catch((error) => {
+        console.error("Backend connection failed:", error);
+      });
+  }, []);
   
   return (
     <QueryClientProvider client={queryClient}>
@@ -27,11 +39,11 @@ const App = () => {
           <Routes>
             <Route path="/" element={<Navigate to="/auth" replace />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/dashboard" element={getSession() ? <Dashboard /> : <Navigate to="/auth" replace />}>
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>}>
               <Route index element={<Navigate to="new-form" replace />} />
-              <Route path="new-form" element={getSession() ? <NewForm /> : <Navigate to="/auth" replace />} />
-              <Route path="history" element={getSession() ? <History /> : <Navigate to="/auth" replace />} />
-              <Route path="settings" element={getSession() ? <Settings /> : <Navigate to="/auth" replace />} />
+              <Route path="new-form" element={<ProtectedRoute><NewForm /></ProtectedRoute>} />
+              <Route path="history" element={<ProtectedRoute><History /></ProtectedRoute>} />
+              <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
