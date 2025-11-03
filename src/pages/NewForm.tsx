@@ -15,7 +15,7 @@ import { InlineSheetViewer } from "@/components/InlineSheetViewer";
 import { WeightsTable } from "@/components/WeightsTable";
 import { getSession, saveDraft, commitRun } from "@/lib/storage";
 import { useButtonColor } from "@/hooks/use-button-color";
-import { sendToN8n, sendToCrunchbase, sendToXRLDataToPlatform } from "@/lib/api";
+import { sendToCrunchbase, sendToXRLDataToPlatformDirect } from "@/lib/api";
 
 type XrlState = {
   sector: string;
@@ -235,42 +235,38 @@ const NewForm = () => {
     setShowReview(false);
     setIsSubmitting(true);
 
+    // Track what was sent
+    const submissionSummary = {
+      domains: state.domains,
+      destinations: [] as Array<{ name: string; url: string; data: any }>
+    };
+
     // Send domains to Crunchbase webhook (fire and forget - runs in background)
+    submissionSummary.destinations.push({
+      name: "Crunchbase Input",
+      url: "https://shooky5.app.n8n.cloud/webhook/xrl-crunchbase-input",
+      data: { domains: state.domains }
+    });
     sendToCrunchbase({
       domains: state.domains
     }).catch(error => {
       console.error("Failed to send domains to Crunchbase webhook:", error);
     });
 
-    // Send domains to XRL_DataToPlatform webhook (fire and forget - runs in background)
-    sendToXRLDataToPlatform({
+    // Send domains directly to XRL_DataToPlatform (fire and forget - runs in background)
+    submissionSummary.destinations.push({
+      name: "XRL DataToPlatform",
+      url: "https://shooky5.app.n8n.cloud/webhook/XRL_DataToPlatform",
+      data: { domains: state.domains }
+    });
+    sendToXRLDataToPlatformDirect({
       domains: state.domains
     }).catch(error => {
       console.error("Failed to send domains to XRL_DataToPlatform webhook:", error);
     });
 
-    // Send main submission in background (fire and forget)
-    state.domains.forEach(domain => {
-      const payload = {
-        sector: state.sector,
-        domain: domain,
-        secondary_category: state.secondary_category,
-        goals: state.goals,
-        users: state.users,
-        geography: state.geography,
-        compliance: state.compliance,
-        time_horizon: state.time_horizon,
-        risk_posture: state.risk_posture,
-        llm: state.llm,
-        participants_count: state.participants_count,
-        participants: state.participants,
-        llm_weight_percent: state.llm_weight_percent,
-      };
-
-      sendToN8n(payload).catch(error => {
-        console.error("Failed to send to n8n webhook:", error);
-      });
-    });
+    // Store summary for display
+    (window as any).__lastSubmissionSummary = submissionSummary;
 
     // Wait 3 seconds then continue regardless of webhook status
     await new Promise(resolve => setTimeout(resolve, 3000));
@@ -934,6 +930,7 @@ const NewForm = () => {
                   <h3 className="text-xl font-semibold text-foreground mb-2">Success!</h3>
                   <p className="text-muted-foreground">Your submission has been completed</p>
                 </div>
+                
                 <div className="flex gap-3 justify-center pt-4">
                   <Button 
                     onClick={() => setShowWeightsTable(true)} 

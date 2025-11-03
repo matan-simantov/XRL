@@ -18,10 +18,9 @@ services:
       - path: /*
         name: Cache-Control
         value: public, max-age=0, must-revalidate
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+    # Note: For Render Static Sites, you must manually configure redirects in the Dashboard
+    # Go to Settings > Redirects/Rewrites and add:
+    # Source: /*, Destination: /index.html, Type: Rewrite, Status: 200
 
   - type: web
     name: xrl-backend

@@ -1,88 +1,93 @@
-const express = require('express');
-const cors = require('cors');
-require('dotenv').config();
+import express from "express"
+import cors from "cors"
+import "dotenv/config"
 
-const app = express();
+const app = express()
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+app.use(express.json())
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'XRL backend is live', timestamp: new Date().toISOString() });
-});
+const ORIGIN = process.env.FRONTEND_ORIGIN || "*"
+app.use(cors({ origin: ORIGIN, credentials: true }))
 
-// Routes
-app.get('/', (req, res) => {
-  res.send('XRL backend is live');
-});
+app.get("/api/health", (_, res) => res.json({ ok: true, service: "api", timestamp: new Date().toISOString() }))
 
-// Proxy endpoints for n8n webhooks
-app.post('/api/n8n', async (req, res) => {
+app.get("/", (_, res) => res.send("XRL backend is live"))
+
+// Proxy endpoint for n8n main webhook
+app.post("/api/n8n", async (req, res) => {
   try {
-    const response = await fetch('https://shooky5.app.n8n.cloud/webhook/xrl', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
-    });
-    const data = await response.json().catch(() => ({}));
-    res.json(data);
-  } catch (error) {
-    console.error('n8n proxy error:', error);
-    res.status(500).json({ error: 'Failed to proxy to n8n' });
+    const url = process.env.N8N_WEBHOOK_URL || "https://shooky5.app.n8n.cloud/webhook/xrl"
+    if (!url) return res.status(500).json({ error: "missing N8N_WEBHOOK_URL" })
+
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body)
+    })
+
+    const text = await r.text()
+    let data = null
+    try { data = JSON.parse(text) } catch {}
+    return res.status(r.status).json(data ?? { raw: text })
+  } catch (e) {
+    console.error("n8n proxy error", e)
+    return res.status(500).json({ error: "proxy_failed" })
   }
-});
+})
 
 // Proxy endpoint for Crunchbase webhook
-app.post('/api/crunchbase', async (req, res) => {
+app.post("/api/crunchbase", async (req, res) => {
   try {
-    const response = await fetch('https://shooky5.app.n8n.cloud/webhook/xrl-crunchbase-input', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
-    });
-    const data = await response.json().catch(() => ({}));
-    res.json(data);
-  } catch (error) {
-    console.error('crunchbase proxy error:', error);
-    res.status(500).json({ error: 'Failed to proxy to crunchbase' });
+    const url = process.env.N8N_CRUNCHBASE_URL || "https://shooky5.app.n8n.cloud/webhook/xrl-crunchbase-input"
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body)
+    })
+    const text = await r.text()
+    let data = null
+    try { data = JSON.parse(text) } catch {}
+    return res.status(r.status).json(data ?? { raw: text })
+  } catch (e) {
+    console.error("crunchbase proxy error", e)
+    return res.status(500).json({ error: "proxy_failed" })
   }
-});
+})
 
-// Proxy endpoint for XRL_DataToPlatform webhook
-app.post('/api/xrl-data-to-platform', async (req, res) => {
+// Proxy endpoint for XRL_DataToPlatform webhook (without test)
+app.post("/api/xrl-data-to-platform", async (req, res) => {
   try {
-    const response = await fetch('https://shooky5.app.n8n.cloud/webhook-test/XRL_DataToPlatform', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
-    });
-    const data = await response.json().catch(() => ({}));
-    res.json(data);
-  } catch (error) {
-    console.error('xrl-data-to-platform proxy error:', error);
-    res.status(500).json({ error: 'Failed to proxy to xrl-data-to-platform' });
+    const url = process.env.N8N_XRL_DATA_URL || "https://shooky5.app.n8n.cloud/webhook/XRL_DataToPlatform"
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req.body)
+    })
+    const text = await r.text()
+    let data = null
+    try { data = JSON.parse(text) } catch {}
+    return res.status(r.status).json(data ?? { raw: text })
+  } catch (e) {
+    console.error("xrl-data-to-platform proxy error", e)
+    return res.status(500).json({ error: "proxy_failed" })
   }
-});
+})
 
 // Proxy endpoint for fetching results
-app.get('/api/results/:runId', async (req, res) => {
+app.get("/api/results/:runId", async (req, res) => {
   try {
-    const { runId } = req.params;
-    const response = await fetch(`https://shooky5.app.n8n.cloud/webhook-test/XRL_DataToPlatform?runId=${runId}`);
-    const data = await response.json().catch(() => ({}));
-    res.json(data);
-  } catch (error) {
-    console.error('results proxy error:', error);
-    res.status(500).json({ error: 'Failed to fetch results' });
+    const { runId } = req.params
+    const url = process.env.N8N_RESULTS_URL || `https://shooky5.app.n8n.cloud/webhook-test/XRL_DataToPlatform`
+    const r = await fetch(`${url}?runId=${runId}`)
+    const text = await r.text()
+    let data = null
+    try { data = JSON.parse(text) } catch {}
+    return res.status(r.status).json(data ?? { raw: text })
+  } catch (e) {
+    console.error("results proxy error", e)
+    return res.status(500).json({ error: "proxy_failed" })
   }
-});
+})
 
-// Start server
-const PORT = process.env.PORT || 10000;
-
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
-
+const port = process.env.PORT || 10000
+app.listen(port, () => console.log(`api on ${port}`))

@@ -41,6 +41,17 @@ export async function sendToXRLDataToPlatform(payload: any) {
   return r.json().catch(() => ({}))
 }
 
+export async function sendToXRLDataToPlatformDirect(payload: any) {
+  // Send via backend proxy
+  const r = await fetch(`${API}/api/xrl-data-to-platform`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+  if (!r.ok) throw new Error("XRL_DataToPlatform error")
+  return r.json().catch(() => ({}))
+}
+
 export async function fetchResultsFromN8n(runId: string) {
   const r = await fetch(`${API}/api/results/${runId}`)
   if (!r.ok) throw new Error("Failed to fetch results")
