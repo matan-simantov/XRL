@@ -242,28 +242,46 @@ const NewForm = () => {
     };
 
     // Send domains to Crunchbase webhook (fire and forget - runs in background)
-    submissionSummary.destinations.push({
-      name: "Crunchbase Input",
-      url: "https://shooky5.app.n8n.cloud/webhook/xrl-crunchbase-input",
-      data: { domains: state.domains }
-    });
-    sendToCrunchbase({
-      domains: state.domains
-    }).catch(error => {
-      console.error("Failed to send domains to Crunchbase webhook:", error);
-    });
+    if (state.domains && state.domains.length > 0) {
+      console.log("Preparing to send domains to Crunchbase:", state.domains)
+      submissionSummary.destinations.push({
+        name: "Crunchbase Input",
+        url: "https://shooky5.app.n8n.cloud/webhook/xrl-crunchbase-input",
+        data: { domains: state.domains }
+      })
+      sendToCrunchbase({
+        domains: state.domains
+      })
+        .then(response => {
+          console.log("Crunchbase webhook sent successfully:", response)
+        })
+        .catch(error => {
+          console.error("Failed to send domains to Crunchbase webhook:", error)
+        })
+    } else {
+      console.warn("No domains to send to Crunchbase")
+    }
 
-    // Send domains directly to XRL_DataToPlatform (fire and forget - runs in background)
-    submissionSummary.destinations.push({
-      name: "XRL DataToPlatform",
-      url: "https://shooky5.app.n8n.cloud/webhook/XRL_DataToPlatform",
-      data: { domains: state.domains }
-    });
-    sendToXRLDataToPlatformDirect({
-      domains: state.domains
-    }).catch(error => {
-      console.error("Failed to send domains to XRL_DataToPlatform webhook:", error);
-    });
+    // Send domains to XRL_DataToPlatform (fire and forget - runs in background)
+    if (state.domains && state.domains.length > 0) {
+      console.log("Preparing to send domains to XRL DataToPlatform:", state.domains)
+      submissionSummary.destinations.push({
+        name: "XRL DataToPlatform",
+        url: "https://shooky5.app.n8n.cloud/webhook/XRL_DataToPlatform",
+        data: { domains: state.domains }
+      })
+      sendToXRLDataToPlatformDirect({
+        domains: state.domains
+      })
+        .then(response => {
+          console.log("XRL DataToPlatform webhook sent successfully:", response)
+        })
+        .catch(error => {
+          console.error("Failed to send domains to XRL_DataToPlatform webhook:", error)
+        })
+    } else {
+      console.warn("No domains to send to XRL DataToPlatform")
+    }
 
     // Store summary for display
     (window as any).__lastSubmissionSummary = submissionSummary;

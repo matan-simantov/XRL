@@ -27,11 +27,13 @@ export async function sendToN8n(payload: any) {
 }
 
 export async function sendToCrunchbase(payload: any) {
+  console.log("Sending to Crunchbase:", payload)
   const r = await fetch(`${API}/api/crunchbase`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   })
+  console.log("Crunchbase response status:", r.status)
   if (!r.ok) throw new Error("crunchbase error")
   return r.json().catch(() => ({}))
 }
@@ -48,11 +50,13 @@ export async function sendToXRLDataToPlatform(payload: any) {
 
 export async function sendToXRLDataToPlatformDirect(payload: any) {
   // Send via backend proxy
+  console.log("Sending to XRL DataToPlatform:", payload)
   const r = await fetch(`${API}/api/xrl-data-to-platform`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   })
+  console.log("XRL DataToPlatform response status:", r.status)
   if (!r.ok) throw new Error("XRL_DataToPlatform error")
   return r.json().catch(() => ({}))
 }

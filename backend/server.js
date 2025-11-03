@@ -4,10 +4,33 @@ import fetch from "node-fetch"
 import "dotenv/config"
 
 const app = express()
+
+// Parse JSON body
 app.use(express.json())
 
-const ORIGIN = process.env.FRONTEND_ORIGIN || "*"
-app.use(cors({ origin: ORIGIN, credentials: true }))
+// CORS configuration - support multiple origins
+const allowedOrigins = process.env.FRONTEND_ORIGIN 
+  ? process.env.FRONTEND_ORIGIN.split(',').map(o => o.trim())
+  : ["*"]
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error("Not allowed by CORS"))
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-n8n-secret"],
+  exposedHeaders: ["Content-Type"]
+}
+
+app.use(cors(corsOptions))
+
+// Handle preflight requests explicitly
+app.options("*", cors(corsOptions))
 
 app.get("/api/health", (_, res) => res.json({ ok: true, service: "api", timestamp: new Date().toISOString() }))
 
@@ -39,18 +62,26 @@ app.post("/api/n8n", async (req, res) => {
 app.post("/api/crunchbase", async (req, res) => {
   try {
     const url = process.env.N8N_CRUNCHBASE_URL || "https://shooky5.app.n8n.cloud/webhook/xrl-crunchbase-input"
+    console.log("Proxying to Crunchbase:", url, req.body)
+    
     const r = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req.body)
     })
+    
     const txt = await r.text()
     let data = null
-    try { data = JSON.parse(txt) } catch {}
-    return res.status(r.status).json(data ?? { raw: txt })
+    try { 
+      data = JSON.parse(txt) 
+    } catch (parseError) {
+      console.warn("Failed to parse response as JSON:", txt.substring(0, 100))
+    }
+    
+    return res.status(r.status).json(data ?? { raw: txt, status: r.status })
   } catch (e) {
     console.error("crunchbase proxy error", e)
-    return res.status(500).json({ error: "proxy_failed" })
+    return res.status(500).json({ error: "proxy_failed", message: e.message })
   }
 })
 
@@ -58,18 +89,26 @@ app.post("/api/crunchbase", async (req, res) => {
 app.post("/api/xrl-data-to-platform", async (req, res) => {
   try {
     const url = process.env.N8N_XRL_DATA_URL || "https://shooky5.app.n8n.cloud/webhook/XRL_DataToPlatform"
+    console.log("Proxying to XRL DataToPlatform:", url, req.body)
+    
     const r = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req.body)
     })
+    
     const txt = await r.text()
     let data = null
-    try { data = JSON.parse(txt) } catch {}
-    return res.status(r.status).json(data ?? { raw: txt })
+    try { 
+      data = JSON.parse(txt) 
+    } catch (parseError) {
+      console.warn("Failed to parse response as JSON:", txt.substring(0, 100))
+    }
+    
+    return res.status(r.status).json(data ?? { raw: txt, status: r.status })
   } catch (e) {
     console.error("xrl-data-to-platform proxy error", e)
-    return res.status(500).json({ error: "proxy_failed" })
+    return res.status(500).json({ error: "proxy_failed", message: e.message })
   }
 })
 
