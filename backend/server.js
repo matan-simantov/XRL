@@ -82,7 +82,13 @@ app.post("/api/crunchbase", async (req, res) => {
 app.post("/api/xrl-data-to-platform", async (req, res) => {
   try {
     const url = process.env.N8N_XRL_DATA_URL || "https://shooky5.app.n8n.cloud/webhook/XRL_DataToPlatform"
-    console.log("Proxying to XRL DataToPlatform:", url, req.body)
+    console.log("Proxying to XRL DataToPlatform:", url)
+    console.log("Request body:", JSON.stringify(req.body, null, 2))
+    
+    if (!url || url.trim() === "") {
+      console.error("N8N_XRL_DATA_URL is not set or empty")
+      return res.status(500).json({ error: "proxy_config_error", message: "N8N_XRL_DATA_URL not configured" })
+    }
     
     const r = await fetch(url, {
       method: "POST",
@@ -90,7 +96,11 @@ app.post("/api/xrl-data-to-platform", async (req, res) => {
       body: JSON.stringify(req.body)
     })
     
+    console.log("Response status from n8n:", r.status, r.statusText)
+    
     const txt = await r.text()
+    console.log("Response body from n8n (first 200 chars):", txt.substring(0, 200))
+    
     let data = null
     try { 
       data = JSON.parse(txt) 
@@ -98,10 +108,26 @@ app.post("/api/xrl-data-to-platform", async (req, res) => {
       console.warn("Failed to parse response as JSON:", txt.substring(0, 100))
     }
     
-    return res.status(r.status).json(data ?? { raw: txt, status: r.status })
+    // אם n8n מחזיר שגיאה, נחזיר אותה עם פרטים
+    if (!r.ok) {
+      console.error(`n8n returned error status ${r.status}:`, txt.substring(0, 200))
+      return res.status(r.status).json({ 
+        error: "n8n_error", 
+        status: r.status,
+        statusText: r.statusText,
+        body: data ?? txt.substring(0, 200)
+      })
+    }
+    
+    return res.status(200).json(data ?? { raw: txt, status: r.status })
   } catch (e) {
-    console.error("xrl-data-to-platform proxy error", e)
-    return res.status(500).json({ error: "proxy_failed", message: e.message })
+    console.error("xrl-data-to-platform proxy error:", e)
+    console.error("Error stack:", e.stack)
+    return res.status(500).json({ 
+      error: "proxy_failed", 
+      message: e.message,
+      stack: process.env.NODE_ENV === "development" ? e.stack : undefined
+    })
   }
 })
 
@@ -109,40 +135,8 @@ app.post("/api/xrl-data-to-platform", async (req, res) => {
 // In-memory storage for results (replace with database in production)
 const resultsCache = new Map()
 
-// in-memory cache ל-MVP - התוצאה האחרונה בנורמליזציה חדשה
+// in-memory cache ל-MVP - התוצאה האחרונה
 let latestNormalized = null
-
-// עוזר לנרמול: הופך {domains:{'1':[...],...}} ל־
-// { matrix, domainKeys, paramCount } כש־matrix הוא מערך דו־ממדית [domainIndex][paramIndex] = value|null
-function normalizeDomainsPayload(body) {
-  const domains = body?.domains || {}
-  const domainKeys = ["1", "2", "3", "4", "5"]
-  
-  // כמה פרמטרים יש בסך הכל
-  const paramCount = Object.values(domains)
-    .reduce((max, arr) => {
-      if (!Array.isArray(arr)) return max
-      const maxParam = arr.reduce((m, item) => {
-        const p = Number(item?.parameter) || 0
-        return Math.max(m, p)
-      }, 0)
-      return Math.max(max, maxParam)
-    }, 0)
-
-  const matrix = domainKeys.map(() => Array.from({ length: paramCount }, () => null))
-
-  domainKeys.forEach((k, di) => {
-    const arr = Array.isArray(domains[k]) ? domains[k] : []
-    for (const item of arr) {
-      const p = Number(item?.parameter)
-      const v = item?.value
-      if (!Number.isInteger(p) || p <= 0) continue
-      matrix[di][p - 1] = typeof v === "number" ? v : Number(v)
-    }
-  })
-
-  return { matrix, domainKeys, paramCount }
-}
 
 // Helper for debugging
 app.get("/api/debug/routes", (_, res) => {
@@ -151,47 +145,58 @@ app.get("/api/debug/routes", (_, res) => {
 
 // POST /api/n8n/callback - callback endpoint from n8n
 // CORS פתוח רק לנתיב callback כדי לא לחסום שרת→שרת
-app.post("/api/n8n/callback", cors(), async (req, res) => {
-  console.log("callback hit headers:", JSON.stringify(req.headers))
-  
-  const required = process.env.N8N_CALLBACK_SECRET
-  if (required) {
-    const secret = req.header("x-n8n-secret")
-    if (secret !== required) {
-      console.log("callback unauthorized")
-      return res.status(401).json({ error: "unauthorized" })
-    }
-  }
+app.post("/api/n8n/callback", cors(), (req, res) => {
+  const secret = req.header("x-n8n-secret")
 
-  console.log("callback payload:", JSON.stringify(req.body, null, 2))
+  if (process.env.N8N_CALLBACK_SECRET && secret !== process.env.N8N_CALLBACK_SECRET)
+    return res.status(401).json({ error: "unauthorized" })
 
-  // ולידציה בסיסית לפורמט החדש
-  if (!req.body || !req.body.domains) {
+  const body = req.body
+
+  // וולידציה של הפורמט מ-n8n
+  if (!body || !Array.isArray(body.matrix) || !Array.isArray(body.domain_keys)) {
     return res.status(400).json({ 
       error: "invalid_payload", 
-      hint: "expected { domains: { '1': [ {parameter,value} ], ... } }" 
+      hint: "expected { matrix: [[...]], domain_keys: [...], param_count: number, meta: {...} }" 
     })
   }
 
-  // נרמול לפורמט החדש
-  const normalized = normalizeDomainsPayload(req.body)
+  const matrix = body.matrix
+  const domainKeys = body.domain_keys
+  const paramCount = body.param_count || matrix.length
+  const meta = body.meta || {}
+
+  console.log("received matrix:", {
+    rows: matrix.length,
+    cols: matrix[0]?.length || 0,
+    paramCount,
+    domainKeys
+  })
+
+  // שמירה ב-latestNormalized
   latestNormalized = {
     receivedAt: new Date().toISOString(),
-    meta: req.body.meta || {},
-    ...normalized
+    matrix,
+    domainKeys,
+    paramCount,
+    meta
   }
 
-  console.log("Normalized data saved:", JSON.stringify(latestNormalized, null, 2))
+  console.log("Data saved:", {
+    paramCount,
+    domainCount: domainKeys.length,
+    sample: matrix[0]?.slice(0, 3)
+  })
 
   // שמירה גם ב-cache הישן למען תאימות לאחור
-  let runId = req.body.meta?.runId || `n8n-${Date.now()}`
+  let runId = meta?.runId || `n8n-${Date.now()}`
   resultsCache.set(runId, {
     runId,
-    results: normalized,
+    results: latestNormalized,
     receivedAt: latestNormalized.receivedAt
   })
 
-  return res.json({ ok: true, received: true, paramCount: normalized.paramCount })
+  res.json({ ok: true, received: matrix.length, paramCount, domainCount: domainKeys.length })
 })
 
 // שליפה לפרונט - התוצאה האחרונה

@@ -19,25 +19,30 @@ export default function DomainResultsTable() {
 
   const { matrix, domainKeys, paramCount } = data
 
+  // matrix[paramIndex][domainIndex] = value
+  // matrix[0][0] = parameter 1, domain 1
+  // matrix[0][1] = parameter 1, domain 2
+  // matrix[1][0] = parameter 2, domain 1
+
   return (
     <div className="p-4 overflow-auto">
       <table className="min-w-full border border-gray-200">
         <thead>
           <tr>
-            <th className="px-3 py-2 border-b text-left">Domain</th>
-            {Array.from({ length: paramCount }, (_, i) => (
-              <th key={i} className="px-3 py-2 border-b text-left">Parameter {i + 1}</th>
+            <th className="px-3 py-2 border-b text-left">Parameter</th>
+            {domainKeys.map((dk: number | string) => (
+              <th key={dk} className="px-3 py-2 border-b text-left">Domain {dk}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {domainKeys.map((dk: string, di: number) => (
-            <tr key={dk} className="odd:bg-gray-50">
-              <td className="px-3 py-2 border-b">Domain {dk}</td>
-              {Array.from({ length: paramCount }, (_, pi) => {
-                const val = matrix?.[di]?.[pi]
+          {Array.from({ length: paramCount }, (_, paramIndex) => (
+            <tr key={paramIndex} className="odd:bg-gray-50">
+              <td className="px-3 py-2 border-b font-medium">Parameter {paramIndex + 1}</td>
+              {domainKeys.map((_, domainIndex) => {
+                const val = matrix?.[paramIndex]?.[domainIndex]
                 return (
-                  <td key={pi} className="px-3 py-2 border-b">
+                  <td key={domainIndex} className="px-3 py-2 border-b">
                     {val == null || Number.isNaN(val) ? "" : String(val)}
                   </td>
                 )
