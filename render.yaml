@@ -23,7 +23,7 @@ services:
     name: xrl-backend
     env: node
     plan: free
-    buildCommand: cd backend && npm install
+    buildCommand: npm install --prefix backend
     startCommand: cd backend && node server.js
     envVars:
       - key: NODE_ENV

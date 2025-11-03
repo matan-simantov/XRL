@@ -22,16 +22,21 @@ Render מחפש את `server.js` בתיקייה הלא נכונה.
 1. Push את השינויים ל-Git
 2. ב-Render Dashboard, לחץ על "Manual Deploy" → "Clear build cache & deploy"
 
-### אופציה 2: עדכון ידני ב-Render Dashboard
+### אופציה 2: עדכון ידני ב-Render Dashboard (המומלץ!)
 
 אם אתה משתמש בהגדרות ידניות ב-Render:
 
-1. לך ל-service שלך ב-Render Dashboard
+1. לך ל-service שלך ב-Render Dashboard (xrl-backend)
 2. לחץ על "Settings"
-3. מצא את השדה **"Root Directory"**
+3. מצא את השדה **"Root Directory"** (זה המפתח!)
 4. הזן: `backend`
-5. שמור
-6. לחץ על "Manual Deploy" → "Clear build cache & deploy"
+5. שמור את השינויים
+6. עדכן את **Build Command** ל: `npm install`
+7. עדכן את **Start Command** ל: `npm start`
+8. שמור שוב
+9. לחץ על "Manual Deploy" → "Clear build cache & deploy"
+
+**⚠️ חשוב:** Root Directory חייב להיות מוגדר ל-`backend`! בלי זה זה לא יעבוד.
 
 ### אופציה 3: אם עדיין לא עובד
 
