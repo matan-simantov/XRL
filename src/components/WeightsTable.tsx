@@ -368,6 +368,8 @@ export const WeightsTable = ({ llms = [], participants = [], domains = [], initi
   const [resultData, setResultData] = useState<Record<string, Record<number, number>>>({});
   // Always start with weights view when opening from History
   const [viewMode, setViewMode] = useState<'weights' | 'results'>('weights');
+  const [showDummyDataDialog, setShowDummyDataDialog] = useState(false);
+  const [hasRealData, setHasRealData] = useState(false);
   
   // Track which categories are expanded (default: all closed)
   const [expandedCategories, setExpandedCategories] = useState<Set<CategoryName>>(new Set());
@@ -539,8 +541,17 @@ export const WeightsTable = ({ llms = [], participants = [], domains = [], initi
       }
       
       if (savedState.resultData) {
-        setResultData(savedState.resultData);
-        setShowResultsTable(true);
+        const savedData = savedState.resultData;
+        // Only restore if there's actual data
+        const hasAnyData = Object.keys(savedData).some(domain => {
+          const domainData = savedData[domain];
+          return domainData && typeof domainData === 'object' && Object.keys(domainData).length > 0;
+        });
+        if (hasAnyData) {
+          setResultData(savedData);
+          setShowResultsTable(true);
+          setHasRealData(true);
+        }
       }
       if (savedState.llmWeight !== undefined) {
         setLlmWeight(savedState.llmWeight);
@@ -1101,10 +1112,13 @@ Best regards`);
     return llmAvg * llmWeightPercent + humanAvg * humanWeightPercent;
   };
 
-  // Generate realistic result data for all domains based on parameter types
-  // Function to generate dummy results (fallback)
+  // Generate dummy results only for the parameters that should return results
+  // Parameters that should have results: 0, 1, 2, 3, 4, 5, 6, 8, 10
   const generateDummyResults = (): Record<string, Record<number, number>> => {
     const results: Record<string, Record<number, number>> = {};
+    
+    // Only these parameter indices should have results
+    const activeParameterIndices = [0, 1, 2, 3, 4, 5, 6, 8, 10];
     
     domains.forEach((domain) => {
       results[domain] = {};
@@ -1113,8 +1127,8 @@ Best regards`);
       const domainSeed = domain.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
       const domainMultiplier = 0.8 + (domainSeed % 40) / 100; // 0.8 to 1.2
       
-      // Generate results for all parameters
-      parameters.forEach((_, paramIndex) => {
+      // Generate results only for active parameters
+      activeParameterIndices.forEach((paramIndex) => {
         // Get the final weight for this domain and parameter
         const finalWeight = calculateFinalWeightForDomain(domain, paramIndex);
         const weightInfluence = finalWeight / 10; // 0-10 range
@@ -1122,35 +1136,34 @@ Best regards`);
         let result: number;
         
         switch (paramIndex) {
-          case 0: // Number of IPOs (baseline: 15)
+          case 0: // Number of IPOs in the sector worldwide in the past 5 years (2020–2025)
             result = Math.round((10 + weightInfluence * 3 + Math.random() * 10) * domainMultiplier);
             break;
-          case 1: // Acquisitions/Mergers (baseline: 220)
+          case 1: // Number of companies worldwide that were acquired or merged in the past 5 years (2020–2025)
             result = Math.round((150 + weightInfluence * 30 + Math.random() * 100) * domainMultiplier);
             break;
-          case 2: // Active Companies (baseline: 3,200)
+          case 2: // Number of active companies in the sector worldwide
             result = Math.round((2500 + weightInfluence * 300 + Math.random() * 1000) * domainMultiplier);
             break;
-          case 3: // New Companies (baseline: 900)
+          case 3: // Number of new companies in the past 5 years (2020–2025)
             result = Math.round((600 + weightInfluence * 100 + Math.random() * 400) * domainMultiplier);
             break;
-          case 4: // Pre-Seed & Seed (baseline: 1,200)
+          case 4: // Number of companies in the sector worldwide that raised Pre-Seed & Seed rounds (2020–2025)
             result = Math.round((800 + weightInfluence * 150 + Math.random() * 500) * domainMultiplier);
             break;
-          case 5: // Series A (baseline: 650)
+          case 5: // Number of companies in the sector worldwide that raised a Series A round (2020–2025)
             result = Math.round((450 + weightInfluence * 80 + Math.random() * 300) * domainMultiplier);
             break;
-          case 6: // Series B-C (baseline: 380)
+          case 6: // Number of companies in the sector worldwide that raised Series B–C rounds (2020–2025)
             result = Math.round((250 + weightInfluence * 50 + Math.random() * 180) * domainMultiplier);
             break;
-          case 8: // Series A/Seed Ratio (baseline: ~54%)
+          case 8: // Ratio of companies that raised a Series A round out of those that raised a Seed round in the past 5 years (2020–2025)
             result = parseFloat((45 + weightInfluence * 3 + Math.random() * 15).toFixed(1));
             break;
-          case 10: // Average Company Age (baseline: ~7.5 years)
+          case 10: // Average age of an active company worldwide
             result = parseFloat((6 + weightInfluence * 0.5 + Math.random() * 2.5).toFixed(1));
             break;
           default:
-            // Should not happen for active parameters, but safety fallback
             result = 0;
         }
         
@@ -1173,34 +1186,91 @@ Best regards`);
         // Fetch data from n8n via backend proxy
         const data = await fetchResultsFromN8n(runId);
         // Check if data has results structure
-        if (data && data.results) {
-          n8nData = data.results;
-        } else if (data && typeof data === 'object') {
-          // If data is already in the correct format
-          n8nData = data;
+        if (data && data.results && typeof data.results === 'object') {
+          const results = data.results;
+          // Check if results object has any actual data
+          const hasData = Object.keys(results).some(domain => {
+            const domainData = results[domain];
+            return domainData && typeof domainData === 'object' && Object.keys(domainData).length > 0;
+          });
+          
+          if (hasData) {
+            n8nData = results;
+            setHasRealData(true);
+          }
         }
       } catch (error) {
         console.error("Failed to fetch data from n8n:", error);
       }
     }
     
-    // If no data from n8n, show warning and use dummy data
-    if (!n8nData) {
-      toast.warning("No data received from n8n", {
-        description: "Displaying dummy data. Real data will be available once n8n processing is complete.",
-        duration: 5000,
-      });
-      n8nData = generateDummyResults();
-    } else {
+    // Only show results table if we have real data from n8n
+    if (n8nData && Object.keys(n8nData).length > 0) {
+      setResultData(n8nData);
+      setShowResultsTable(true);
+      setViewMode('results');
       toast.success("Real data loaded from n8n", {
         description: "Displaying actual results from n8n processing.",
         duration: 3000,
       });
+    } else {
+      // No data received - don't show results table
+      setResultData({});
+      setShowResultsTable(false);
+      setHasRealData(false);
+      toast.info("Results not ready yet", {
+        description: "Data from n8n is still being processed. Results will appear automatically when ready.",
+        duration: 5000,
+      });
+    }
+  };
+
+  const handleShowResults = async () => {
+    const runId = formData?.id?.toString();
+    let n8nData: Record<string, Record<number, number>> | null = null;
+    
+    if (runId) {
+      try {
+        const data = await fetchResultsFromN8n(runId);
+        if (data && data.results && typeof data.results === 'object') {
+          const results = data.results;
+          const hasData = Object.keys(results).some(domain => {
+            const domainData = results[domain];
+            return domainData && typeof domainData === 'object' && Object.keys(domainData).length > 0;
+          });
+          
+          if (hasData) {
+            n8nData = results;
+            setHasRealData(true);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch data from n8n:", error);
+      }
     }
     
-    setResultData(n8nData);
+    if (n8nData && Object.keys(n8nData).length > 0) {
+      setResultData(n8nData);
+      setShowResultsTable(true);
+      setViewMode('results');
+      toast.success("Real data loaded from n8n");
+    } else {
+      // No real data - ask if user wants dummy data
+      setShowDummyDataDialog(true);
+    }
+  };
+
+  const handleUseDummyData = () => {
+    setShowDummyDataDialog(false);
+    const dummyData = generateDummyResults();
+    setResultData(dummyData);
     setShowResultsTable(true);
     setViewMode('results');
+    setHasRealData(false);
+    toast.info("Displaying dummy data", {
+      description: "This is sample data. Real results will appear automatically when n8n processing is complete.",
+      duration: 5000,
+    });
   };
 
   // Ensure userWeights is initialized for currentDomain
@@ -1313,13 +1383,22 @@ Best regards`);
                     Weights
                   </Button>
                   <Button 
-                    onClick={() => setViewMode('results')}
+                    onClick={handleShowResults}
                     variant={viewMode === 'results' ? 'default' : 'outline'}
                     size="sm"
                   >
                     Results
                   </Button>
                 </div>
+              )}
+              {!showResultsTable && (
+                <Button 
+                  onClick={handleShowResults}
+                  variant="outline"
+                  size="sm"
+                >
+                  View Results
+                </Button>
               )}
               <Button variant="ghost" size="sm" onClick={onClose}>
                 <X className="h-4 w-4" />
@@ -1761,9 +1840,25 @@ Best regards`);
           </>
           )}
 
-          {viewMode === 'results' && showResultsTable && (
-            <div className="overflow-x-auto">
-              <table className="border-collapse mx-auto" style={{ width: '100%', maxWidth: '100%', tableLayout: 'auto' }}>
+          {viewMode === 'results' && showResultsTable && (() => {
+            // Only show results table if there's actual data
+            const hasAnyData = Object.keys(resultData).some(domain => {
+              const domainData = resultData[domain];
+              return domainData && typeof domainData === 'object' && Object.keys(domainData).length > 0;
+            });
+            
+            if (!hasAnyData) {
+              return (
+                <div key="no-results" className="text-center py-8 text-muted-foreground">
+                  <p>No results available yet.</p>
+                  <p className="text-sm mt-2">Results will appear automatically when data is received from n8n.</p>
+                </div>
+              );
+            }
+            
+            return (
+              <div key="results-table" className="overflow-x-auto">
+                <table className="border-collapse mx-auto" style={{ width: '100%', maxWidth: '100%', tableLayout: 'auto' }}>
                 <thead>
                   <tr className="border-b-2 border-border">
                     <th className="text-center p-2 font-semibold text-foreground bg-background whitespace-nowrap" style={{ width: 'auto', minWidth: '150px', maxWidth: '200px' }}>
@@ -1827,7 +1922,8 @@ Best regards`);
                           })}
                         </tr>
                         {/* Parameters in this category - only show if expanded */}
-                        {expandedCategories.has(category) && categoryParams.map((paramIndex) => {
+                        {/* Only show parameters that should have results: 0, 1, 2, 3, 4, 5, 6, 8, 10 */}
+                        {expandedCategories.has(category) && categoryParams.filter(paramIndex => [0, 1, 2, 3, 4, 5, 6, 8, 10].includes(paramIndex)).map((paramIndex) => {
                           const param = parameters[paramIndex];
                           return (
                             <tr key={paramIndex} className="border-b border-border hover:bg-accent/50 transition-colors">
@@ -1854,7 +1950,6 @@ Best regards`);
                                       
                                       // Format based on parameter type
                                       if (paramIndex === 8) return `${value}%`; // Ratio percentage
-                                      if (paramIndex === 9) return value.toFixed(2); // New Blood Flow (decimal)
                                       if (paramIndex === 10) return `${value} yrs`; // Average age in years
                                       return Math.round(value).toString(); // Whole numbers for counts
                                     })()}
@@ -1870,7 +1965,8 @@ Best regards`);
                 </tbody>
               </table>
             </div>
-          )}
+            );
+          })()}
         </CardContent>
       </Card>
 
@@ -2081,6 +2177,26 @@ Best regards`);
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dummy Data Confirmation Dialog */}
+      <AlertDialog open={showDummyDataDialog} onOpenChange={setShowDummyDataDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>No Real Data Available</AlertDialogTitle>
+            <AlertDialogDescription>
+              Results from n8n are not ready yet. Would you like to see sample (dummy) data instead?
+              <br /><br />
+              Note: Real results will appear automatically when n8n processing is complete.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No, wait for real data</AlertDialogCancel>
+            <AlertDialogAction onClick={handleUseDummyData}>
+              Yes, show dummy data
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

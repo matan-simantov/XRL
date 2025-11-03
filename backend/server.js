@@ -128,22 +128,76 @@ app.post("/api/n8n/callback", cors(), async (req, res) => {
     }
   }
 
-  console.log("callback payload:", JSON.stringify(req.body))
+  console.log("callback payload:", JSON.stringify(req.body, null, 2))
 
-  const { runId, results } = req.body
-
-  // Save results to cache (in production, save to database)
-  // Structure: { [domain]: { [paramIndex]: value } }
+  // Try to extract runId and results from different possible formats
+  let runId = req.body.runId
+  let results = req.body.results
+  
+  // If data comes in n8n format with domains object
+  if (!runId && req.body.domains) {
+    console.log("Detected n8n format with domains object")
+    // Extract runId from meta or generate one
+    runId = req.body.meta?.runId || req.body.meta?.flow || `n8n-${Date.now()}`
+    
+    // Convert domains object to results format
+    // Expected format: { [domain]: { [paramIndex]: number } }
+    results = {}
+    
+    if (req.body.domains && typeof req.body.domains === "object") {
+      Object.keys(req.body.domains).forEach((domainKey) => {
+        const domainValue = req.body.domains[domainKey]
+        if (domainValue && domainValue !== "") {
+          // Get domain name from key or value
+          const domainName = domainKey.startsWith("Domain ") 
+            ? domainValue  // If key is "Domain 1", use value as domain name
+            : domainKey
+          
+          // If we have actual domain data, structure it properly
+          // For now, store the value as parameter 0
+          if (domainName && domainName !== "") {
+            results[domainName] = {
+              0: typeof domainValue === "string" ? parseFloat(domainValue) || 0 : domainValue
+            }
+          }
+        }
+      })
+    }
+    
+    console.log("Converted format - runId:", runId, "results:", JSON.stringify(results, null, 2))
+  }
+  
+  // If we still have proper runId and results format
   if (runId && results && typeof results === "object") {
+    // Ensure results structure is correct: { [domain]: { [paramIndex]: number } }
+    const normalizedResults = {}
+    Object.keys(results).forEach((domain) => {
+      const domainData = results[domain]
+      if (domainData && typeof domainData === "object") {
+        normalizedResults[domain] = {}
+        Object.keys(domainData).forEach((key) => {
+          const paramIndex = parseInt(key)
+          const value = domainData[key]
+          if (!isNaN(paramIndex)) {
+            normalizedResults[domain][paramIndex] = typeof value === "string" 
+              ? parseFloat(value) || 0 
+              : (typeof value === "number" ? value : 0)
+          }
+        })
+      }
+    })
+
     resultsCache.set(runId, {
       runId,
-      results,
+      results: normalizedResults,
       receivedAt: new Date().toISOString()
     })
-    console.log(`Results saved for runId: ${runId}`, results)
+    console.log(`Results saved for runId: ${runId}`, JSON.stringify(normalizedResults, null, 2))
+  } else {
+    console.log("Warning: Missing runId or results. Full body:", JSON.stringify(req.body, null, 2))
   }
 
-  return res.json({ ok: true, runId })
+  return res.json({ ok: true, runId: runId || null, resultsReceived: !!results })
 })
 
 // GET /api/results/:runId - get results for a specific run
