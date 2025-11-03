@@ -29,11 +29,13 @@ This project consists of two services:
 2. Connect your repository
 3. Configure:
    - **Name**: `xrl-backend`
-   - **Root Directory**: `backend`
+   - **Root Directory**: `backend` ⚠️ **IMPORTANT: Must set this!**
    - **Environment**: Node
    - **Build Command**: `npm install`
    - **Start Command**: `npm start`
    - **Port**: Auto-detect (or set to 10000)
+
+**Note:** If using `render.yaml`, make sure `rootDir: backend` is set for the backend service.
 
 ### Environment Variables
 
