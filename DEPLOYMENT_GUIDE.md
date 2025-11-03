@@ -18,6 +18,7 @@ N8N_WEBHOOK_URL=https://shooky5.app.n8n.cloud/webhook/xrl
 N8N_CRUNCHBASE_URL=https://shooky5.app.n8n.cloud/webhook/xrl-crunchbase-input
 N8N_XRL_DATA_URL=https://shooky5.app.n8n.cloud/webhook/XRL_DataToPlatform
 N8N_RESULTS_URL=https://shooky5.app.n8n.cloud/webhook-test/XRL_DataToPlatform
+N8N_CALLBACK_SECRET=your-secret-key-here
 PORT=10000
 ```
 
