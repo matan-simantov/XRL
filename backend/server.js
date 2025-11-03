@@ -5,31 +5,24 @@ import "dotenv/config"
 
 const app = express()
 
-// Parse JSON body
 app.use(express.json())
 
-// CORS configuration - support multiple origins
-const allowedOrigins = process.env.FRONTEND_ORIGIN 
-  ? process.env.FRONTEND_ORIGIN.split(',').map(o => o.trim())
-  : ["*"]
+const raw = process.env.FRONTEND_ORIGIN || ""
+const allowlist = raw.split(",").map(s => s.trim()).filter(Boolean)
 
 const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
-      callback(null, true)
-    } else {
-      callback(new Error("Not allowed by CORS"))
-    }
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true) // curl / healthchecks
+    if (allowlist.includes(origin)) return cb(null, true)
+    console.log("CORS blocked origin:", origin)
+    return cb(new Error("Not allowed by CORS"))
   },
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "x-n8n-secret"],
-  exposedHeaders: ["Content-Type"]
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-n8n-secret"]
 }
 
 app.use(cors(corsOptions))
-
-// Handle preflight requests explicitly
 app.options("*", cors(corsOptions))
 
 app.get("/api/health", (_, res) => res.json({ ok: true, service: "api", timestamp: new Date().toISOString() }))
@@ -116,31 +109,38 @@ app.post("/api/xrl-data-to-platform", async (req, res) => {
 // In-memory storage for results (replace with database in production)
 const resultsCache = new Map()
 
+// Helper for debugging
+app.get("/api/debug/routes", (_, res) => {
+  res.json({ routes: ["/api/health", "/api/n8n/callback", "/api/debug/routes"] })
+})
+
 // POST /api/n8n/callback - callback endpoint from n8n
-app.post("/api/n8n/callback", async (req, res) => {
-  const secret = req.header("x-n8n-secret")
+// CORS פתוח רק לנתיב callback כדי לא לחסום שרת→שרת
+app.post("/api/n8n/callback", cors(), async (req, res) => {
+  console.log("callback hit headers:", JSON.stringify(req.headers))
   
-  if (secret !== process.env.N8N_CALLBACK_SECRET) {
-    return res.status(401).json({ error: "unauthorized" })
+  const required = process.env.N8N_CALLBACK_SECRET
+  if (required) {
+    const secret = req.header("x-n8n-secret")
+    if (secret !== required) {
+      console.log("callback unauthorized")
+      return res.status(401).json({ error: "unauthorized" })
+    }
   }
+
+  console.log("callback payload:", JSON.stringify(req.body))
 
   const { runId, results } = req.body
 
-  if (!runId) {
-    return res.status(400).json({ error: "missing runId" })
-  }
-
   // Save results to cache (in production, save to database)
   // Structure: { [domain]: { [paramIndex]: value } }
-  if (results && typeof results === "object") {
+  if (runId && results && typeof results === "object") {
     resultsCache.set(runId, {
       runId,
       results,
       receivedAt: new Date().toISOString()
     })
     console.log(`Results saved for runId: ${runId}`, results)
-  } else {
-    console.log("n8n callback received (no results):", req.body)
   }
 
   return res.json({ ok: true, runId })
