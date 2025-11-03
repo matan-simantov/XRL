@@ -11,30 +11,35 @@ import History from "./pages/History";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import { getSession } from "@/lib/storage";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Navigate to="/auth" replace />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/dashboard" element={getSession() ? <Dashboard /> : <Navigate to="/auth" replace />}>
-            <Route index element={<Navigate to="new-form" replace />} />
-            <Route path="new-form" element={getSession() ? <NewForm /> : <Navigate to="/auth" replace />} />
-            <Route path="history" element={getSession() ? <History /> : <Navigate to="/auth" replace />} />
-            <Route path="settings" element={getSession() ? <Settings /> : <Navigate to="/auth" replace />} />
-          </Route>
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  useThemeColor(); // Initialize theme colors
+  
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Navigate to="/auth" replace />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/dashboard" element={getSession() ? <Dashboard /> : <Navigate to="/auth" replace />}>
+              <Route index element={<Navigate to="new-form" replace />} />
+              <Route path="new-form" element={getSession() ? <NewForm /> : <Navigate to="/auth" replace />} />
+              <Route path="history" element={getSession() ? <History /> : <Navigate to="/auth" replace />} />
+              <Route path="settings" element={getSession() ? <Settings /> : <Navigate to="/auth" replace />} />
+            </Route>
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

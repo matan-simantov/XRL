@@ -6,3 +6,4 @@ node_modules/
 *.log
 bun.lockb
 .DS_Store
+turso-credentials.txt

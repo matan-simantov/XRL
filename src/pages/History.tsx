@@ -313,7 +313,16 @@ const History = () => {
                   <div className="font-medium text-foreground">{d.state?.domains?.join(", ") || "Untitled draft"}</div>
                   <div className="text-muted-foreground">Updated {new Date(d.updatedAt).toLocaleString()}</div>
                 </div>
-                <Button size="sm" onClick={() => window.location.href = "/dashboard/new-form"} className={getButtonClasses()}>Resume</Button>
+                <Button 
+                  size="sm" 
+                  onClick={() => {
+                    // Navigate to new form with resume parameter to load draft
+                    window.location.href = "/dashboard/new-form?resume=true";
+                  }} 
+                  className={getButtonClasses()}
+                >
+                  Resume
+                </Button>
               </div>
             ))}
           </div>

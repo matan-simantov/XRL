@@ -21,11 +21,27 @@ export const DashboardSidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const handleNewForm = () => {
+    // Always clear draft before creating new form
+    localStorage.removeItem("xrl:intake:draft");
+    // Force reload by navigating with state
+    if (location.pathname === "/dashboard/new-form") {
+      // Already on the page, trigger a custom event to reset form
+      window.dispatchEvent(new Event("resetNewForm"));
+      // Remove resume parameter from URL if present
+      window.history.replaceState({}, '', '/dashboard/new-form');
+    } else {
+      navigate("/dashboard/new-form");
+    }
+  };
+
   return (
     <Sidebar className="border-r border-border">
       <SidebarContent>
         <div className="p-6 border-b border-border">
-          <h2 className="text-xl font-semibold text-foreground">XRL Platform</h2>
+          <Link to="/dashboard">
+            <h2 className="text-xl font-semibold text-foreground cursor-pointer hover:opacity-80 transition-opacity">XRL Platform</h2>
+          </Link>
         </div>
         <SidebarGroup>
           <SidebarGroupContent>
@@ -38,17 +54,7 @@ export const DashboardSidebar = () => {
                   >
                     {item.url === "/dashboard/new-form" ? (
                       <button
-                        onClick={() => {
-                          // Clear draft before navigating to new form
-                          localStorage.removeItem("xrl:intake:draft");
-                          // Force reload by navigating with state
-                          if (location.pathname === item.url) {
-                            // Already on the page, trigger a custom event to reset form
-                            window.dispatchEvent(new Event("resetNewForm"));
-                          } else {
-                            navigate(item.url);
-                          }
-                        }}
+                        onClick={handleNewForm}
                         className="text-[#111111] hover:bg-accent w-full text-left"
                       >
                         <span>{item.title}</span>

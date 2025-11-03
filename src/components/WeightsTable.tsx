@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { X, Mail, ChevronLeft, ChevronRight, RefreshCw, Eye, EyeOff, FileText, CheckCircle, MoreVertical } from "lucide-react";
+import { X, Mail, ChevronLeft, ChevronRight, RefreshCw, Eye, EyeOff, FileText, CheckCircle, MoreVertical, HelpCircle, ChevronDown, ChevronUp } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -36,6 +36,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { useButtonColor } from "@/hooks/use-button-color";
+import { getColorClasses } from "@/hooks/use-theme-color";
 import { toast } from "sonner";
 import { updateRunTableState, getSession } from "@/lib/storage";
 
@@ -48,75 +49,298 @@ interface WeightsTableProps {
   onClose: () => void;
 }
 
-const parameters = [
-  { short: "IPOs Worldwide", full: "Number of IPOs in the sector worldwide in the past 5 years (2020–2025)" },
-  { short: "M&A Worldwide", full: "Number of companies worldwide that were acquired or merged in the past 5 years (2020–2025)" },
-  { short: "Active Companies Worldwide", full: "Number of active companies in the sector worldwide" },
-  { short: "New Companies Worldwide", full: "Number of new companies in the past 5 years (2020–2025)" },
-  { short: "Pre-Seed & Seed Worldwide", full: "Number of companies in the sector worldwide that raised Pre-Seed & Seed rounds (2020–2025)" },
-  { short: "Series A Worldwide", full: "Number of companies in the sector worldwide that raised a Series A round (2020–2025)" },
-  { short: "Series B–C Worldwide", full: "Number of companies in the sector worldwide that raised Series B–C rounds (2020–2025)" },
-  { short: "Late-Stage Worldwide", full: "Number of companies in the sector worldwide that raised late-stage rounds (2020–2025)" },
-  { short: "Series A/Seed Ratio Worldwide", full: "Ratio of companies that raised a Series A round out of those that raised a Seed round in the past 5 years (2020–2025)" },
-  { short: "New Blood Flow Worldwide", full: '"New blood" flow in the sector worldwide (new activities/active activities) (2020–2025)' },
-  { short: "Avg Company Age Worldwide", full: "Average age of an active company worldwide" },
-  { short: "Total Capital Raised", full: "Total capital raised ($) (2020–2025)" },
-  { short: "Capital: Pre-Seed & Seed", full: "Total capital raised in Pre-Seed & Seed rounds ($) (2020–2025)" },
-  { short: "Capital: Series A", full: "Total capital raised in Series A rounds ($) (2020–2025)" },
-  { short: "Capital: Series B–C", full: "Total capital raised in Series B–C rounds ($) (2020–2025)" },
-  { short: "Capital: Series D–J", full: "Total capital raised in Series D–J rounds ($) (2020–2025)" },
-  { short: "Avg IPO Amount", full: "Average IPO amount ($) for companies that went public between 2020–2025" },
-  { short: "Incubators", full: "Number of incubators in the sector" },
-  { short: "Private Accelerators", full: "Number of private accelerators in the sector" },
-  { short: "Communities", full: "Number of communities in the sector" },
-  { short: "Employees in Sector", full: "Number of employees in the sector" },
-  { short: "Training Programs", full: "Number of professional non-academic training programs and entrepreneurship support frameworks" },
-  { short: "Active Companies Israel", full: "Number of active companies in the sector in Israel" },
-  { short: "New Companies Israel", full: "Number of new companies in the past 5 years (2019–2025)" },
-  { short: "Seed Rounds Israel", full: "Number of companies in the sector in Israel that raised Seed rounds (2020–2025)" },
-  { short: "Series A Israel", full: "Number of companies in the sector in Israel that raised a Series A round (2019–2025)" },
-  { short: "Series B–C Israel", full: "Number of companies in the sector in Israel that raised Series B–C rounds (2020–2025)" },
-  { short: "Late-Stage Israel", full: "Number of companies in the sector in Israel that raised late-stage rounds (2020–2025)" },
-  { short: "% Change in Funding Israel", full: "% change in the number of companies that raised funding in the sector in the past 5 years (2019–2025 compared to 2014–2018)" },
-  { short: "Avg Company Age Israel", full: "Average age of an active company (years)" },
-  { short: "Revenue Stage Israel", full: "Number of active companies in Israel that reached the revenue growth stage (sales stage)" },
-  { short: "M&A Israel", full: "Number of companies acquired or merged in the past 5 years (2020–2025)" },
-  { short: "IPOs Israel", full: "Number of IPOs in the past 5 years (2020–2025)" },
-  { short: "Acquiring Companies Israel", full: "Number of acquiring companies in the past 5 years (2020–2025)" },
-  { short: "Series A/Pre-Seed Ratio Israel", full: "Ratio of companies that raised a Series A round out of those that raised a Seed or Pre-Seed round in the past 5 years (2020–2025)" },
-  { short: "New Blood Flow Israel", full: '"New blood" flow into the sector (new active companies ÷ active companies) (2020–2025)' },
-  { short: "Multinationals Israel", full: "Number of multinationals in the sector in Israel" },
+// Category definitions with default weights
+const CATEGORIES = {
+  "Companies / Firms": {
+    defaultWeight: 24.444444,
+    color: "blue",
+  },
+  "Israeli Funding / Financing": {
+    defaultWeight: 23.703704,
+    color: "green",
+  },
+  "Competition": {
+    defaultWeight: 17.777778,
+    color: "purple",
+  },
+  "Global Funding / Financing": {
+    defaultWeight: 11.111111,
+    color: "orange",
+  },
+  "Knowledge and Infrastructure": {
+    defaultWeight: 8.888889,
+    color: "teal",
+  },
+  "Human Capital": {
+    defaultWeight: 8.148148,
+    color: "pink",
+  },
+  "Academia": {
+    defaultWeight: 5.925926,
+    color: "indigo",
+  },
+} as const;
+
+type CategoryName = keyof typeof CATEGORIES;
+
+interface Parameter {
+  short: string;
+  full: string;
+  category: CategoryName;
+}
+
+// Organized parameters by category
+const parameters: Parameter[] = [
+  // Competition (12 parameters)
+  { short: "IPOs Worldwide", full: "Number of IPOs in the sector worldwide in the past 5 years (2019–2025)", category: "Competition" },
+  { short: "M&A Worldwide", full: "Number of companies worldwide that were acquired or merged in the past 5 years (2019–2025)", category: "Competition" },
+  { short: "Active Companies Worldwide", full: "Number of active companies in the sector worldwide", category: "Competition" },
+  { short: "New Companies Worldwide", full: "Number of new companies in the past 5 years (2019–2025)", category: "Competition" },
+  { short: "Pre-Seed & Seed Worldwide", full: "Number of companies in the sector worldwide that raised Pre-Seed & Seed rounds (2019–2025)", category: "Competition" },
+  { short: "Series A Worldwide", full: "Number of companies in the sector worldwide that raised a Series A round (2019–2025)", category: "Competition" },
+  { short: "Series B–C Worldwide", full: "Number of companies in the sector worldwide that raised Series B–C rounds (2019–2025)", category: "Competition" },
+  { short: "Late-Stage Worldwide", full: "Number of companies in the sector worldwide that raised late-stage rounds (2019–2025)", category: "Competition" },
+  { short: "Series A/Seed Ratio Worldwide", full: "Ratio of companies that raised a Series A round out of those that raised a Seed round in the past 5 years (2019–2025)", category: "Competition" },
+  { short: "New Blood Flow Worldwide", full: '"New blood" flow in the sector worldwide (new activities/active activities) (2019–2025)', category: "Competition" },
+  { short: "Avg Company Age Worldwide", full: "Average age of an active company worldwide", category: "Competition" },
+  { short: "Google Trends Change", full: "% change in Google Trends searches in the past 5 years worldwide (2019–2025)", category: "Competition" },
+  
+  // Global Funding / Financing (6 parameters)
+  { short: "Total Capital Raised", full: "Total capital raised ($) (2019–2025)", category: "Global Funding / Financing" },
+  { short: "Capital: Pre-Seed & Seed", full: "Total capital raised in Pre-Seed & Seed rounds ($) (2019–2025)", category: "Global Funding / Financing" },
+  { short: "Capital: Series A", full: "Total capital raised in Series A rounds ($) (2019–2025)", category: "Global Funding / Financing" },
+  { short: "Capital: Series B–C", full: "Total capital raised in Series B–C rounds ($) (2019–2025)", category: "Global Funding / Financing" },
+  { short: "Capital: Series D–J", full: "Total capital raised in Series D–J rounds ($) (2019–2025)", category: "Global Funding / Financing" },
+  { short: "Avg IPO Amount", full: "Average IPO amount ($) for companies that went public between 2019–2025", category: "Global Funding / Financing" },
+  
+  // Human Capital (5 parameters)
+  { short: "Incubators", full: "Number of incubators in the sector", category: "Human Capital" },
+  { short: "Private Accelerators", full: "Number of private accelerators in the sector", category: "Human Capital" },
+  { short: "Communities", full: "Number of communities in the sector", category: "Human Capital" },
+  { short: "Employees in Sector", full: "Number of employees in the sector", category: "Human Capital" },
+  { short: "Training Programs", full: "Number of professional non-academic training programs and entrepreneurship support frameworks", category: "Human Capital" },
+  
+  // Companies / Firms (15 parameters)
+  { short: "Active Companies Israel", full: "Number of active companies in the sector in Israel", category: "Companies / Firms" },
+  { short: "New Companies Israel", full: "Number of new companies in the past 5 years (2019–2025)", category: "Companies / Firms" },
+  { short: "Seed Rounds Israel", full: "Number of companies in the sector in Israel that raised Seed rounds (2020–2025)", category: "Companies / Firms" },
+  { short: "Series A Israel", full: "Number of companies in the sector in Israel that raised a Series A round (2019–2025)", category: "Companies / Firms" },
+  { short: "Series B–C Israel", full: "Number of companies in the sector in Israel that raised Series B–C rounds (2019–2025)", category: "Companies / Firms" },
+  { short: "Late-Stage Israel", full: "Number of companies in the sector in Israel that raised late-stage rounds (2019–2025)", category: "Companies / Firms" },
+  { short: "% Change in Funding Israel", full: "% change in the number of companies that raised funding in the sector in the past 5 years (2019–2025 compared to 2014–2018)", category: "Companies / Firms" },
+  { short: "Avg Company Age Israel", full: "Average age of an active company (years)", category: "Companies / Firms" },
+  { short: "Revenue Stage Israel", full: "Number of active companies in Israel that reached the revenue growth stage (sales stage)", category: "Companies / Firms" },
+  { short: "M&A Israel", full: "Number of companies acquired or merged in the past 5 years (2019–2025)", category: "Companies / Firms" },
+  { short: "IPOs Israel", full: "Number of IPOs in the past 5 years (2019–2025)", category: "Companies / Firms" },
+  { short: "Acquiring Companies Israel", full: "Number of acquiring companies in the past 5 years (2019–2025)", category: "Companies / Firms" },
+  { short: "Series A/Pre-Seed Ratio Israel", full: "Ratio of companies that raised a Series A round out of those that raised a Seed or Pre-Seed round in the past 5 years (2019–2025)", category: "Companies / Firms" },
+  { short: "New Blood Flow Israel", full: '"New blood" flow into the sector (new active companies ÷ active companies) (2019–2025)', category: "Companies / Firms" },
+  { short: "Multinationals Israel", full: "Number of multinationals in the sector in Israel", category: "Companies / Firms" },
+  
+  // Financing (14 parameters - previously Israeli Funding / Financing)
+  { short: "Non-VC Israeli Investors", full: "Number of Israeli investors who are not venture capital", category: "Israeli Funding / Financing" },
+  { short: "Israeli VC Investors", full: "Number of Israeli venture capital investors", category: "Israeli Funding / Financing" },
+  { short: "Total Capital Raised Israel", full: "Total capital raised ($) (2019–2025)", category: "Israeli Funding / Financing" },
+  { short: "Capital: Seed Israel", full: "Total capital raised in Seed rounds ($) (2019–2025)", category: "Israeli Funding / Financing" },
+  { short: "Capital: Series A Israel", full: "Total capital raised in Series A rounds ($) (2019–2025)", category: "Israeli Funding / Financing" },
+  { short: "Capital: Series B–C Israel", full: "Total capital raised in Series B–C rounds ($) (2019–2025)", category: "Israeli Funding / Financing" },
+  { short: "Capital: Series D–J Israel", full: "Total capital raised in Series D–J rounds ($) (2019–2025)", category: "Israeli Funding / Financing" },
+  { short: "Foreign Investors", full: "Number of foreign investors", category: "Israeli Funding / Financing" },
+  { short: "% Change Total Capital", full: "% change in total capital raised in the past 6 years (2019–2025 compared to 2014–2018)", category: "Israeli Funding / Financing" },
+  { short: "% Change Seed Capital", full: "% change in total capital raised in Seed rounds in the past 6 years (2019–2025 compared to 2014–2018)", category: "Israeli Funding / Financing" },
+  { short: "% Change Series A Capital", full: "% change in total capital raised in Series A rounds in the past 6 years (2019–2025 compared to 2014–2018)", category: "Israeli Funding / Financing" },
+  { short: "% Change Series B–C Capital", full: "% change in total capital raised in Series B–C rounds in the past 6 years (2019–2025 compared to 2014–2018)", category: "Israeli Funding / Financing" },
+  { short: "% Change Late-Stage Capital", full: "% change in total capital raised in late-stage rounds in the past 5 years (2019–2025 compared to 2014–2018)", category: "Israeli Funding / Financing" },
+  { short: "Avg IPO Amount Israel", full: "Average IPO amount ($) for companies that went public between 2019–2025", category: "Israeli Funding / Financing" },
+  
+  // Knowledge and Infrastructure (10 parameters)
+  { short: "Market Size 2030", full: "Market size estimate for 2030", category: "Knowledge and Infrastructure" },
+  { short: "Leading Researchers Worldwide", full: "Number of leading researchers worldwide", category: "Knowledge and Infrastructure" },
+  { short: "Patents Worldwide", full: "Number of patents worldwide", category: "Knowledge and Infrastructure" },
+  { short: "Top 50 Publications Worldwide", full: "Number of publications by the top 50 researchers published in the past 10 years worldwide", category: "Knowledge and Infrastructure" },
+  { short: "Leading Researchers Israel", full: "Number of leading researchers in Israel", category: "Knowledge and Infrastructure" },
+  { short: "Top 50 Publications Israel", full: "Number of publications by the top 50 researchers published in the past 10 years in Israel", category: "Knowledge and Infrastructure" },
+  { short: "Patent Share Israel", full: "Share of patents registered in Israel relative to patents worldwide", category: "Knowledge and Infrastructure" },
+  { short: "Patents Registered Israel", full: "Number of patents registered in Israel", category: "Knowledge and Infrastructure" },
+  { short: "ERC Projects", full: "Number of ERC projects in the field in the past 5 years", category: "Knowledge and Infrastructure" },
+  { short: "Total ERC Grants", full: "Total ERC grants in the field (€) in the past 5 years", category: "Knowledge and Infrastructure" },
+  
+  // Academia (8 parameters - keeping existing)
+  { short: "Academic Programs", full: "Number of academic programs related to the sector", category: "Academia" },
+  { short: "Students Enrolled", full: "Number of students enrolled in sector-related programs", category: "Academia" },
+  { short: "Researchers in Sector", full: "Number of researchers in the sector", category: "Academia" },
+  { short: "University-Industry Collaborations", full: "Number of university-industry collaborations (2020–2025)", category: "Academia" },
+  { short: "Academic Spin-offs", full: "Number of academic spin-offs in the sector (2020–2025)", category: "Academia" },
+  { short: "Research Funding", full: "Research funding in the sector ($) (2020–2025)", category: "Academia" },
+  { short: "PhD Graduates", full: "Number of PhD graduates in sector-related fields (2020–2025)", category: "Academia" },
+  { short: "Academic Institutions", full: "Number of academic institutions with sector programs", category: "Academia" },
 ];
 
-// Active parameter indices (1-7, 9, 11) - indices 0-6, 8, 10
-const ACTIVE_PARAMETER_INDICES = [0, 1, 2, 3, 4, 5, 6, 8, 10];
+// Helper function to get parameters by category
+const getParametersByCategory = (category: CategoryName): Parameter[] => {
+  return parameters.filter(p => p.category === category);
+};
+
+// Helper function to get parameter indices by category
+const getParameterIndicesByCategory = (category: CategoryName): number[] => {
+  return parameters
+    .map((p, index) => ({ param: p, index }))
+    .filter(({ param }) => param.category === category)
+    .map(({ index }) => index);
+};
+
+// Generate explanation for LLM based on its weights (2 sentences)
+const generateLLMExplanation = (llmName: string): string => {
+  const explanations = [
+    `Competition category received higher weight due to observed market saturation signals and increased competitive dynamics in this sector. Global Funding was reduced based on current economic trends indicating tighter capital availability.`,
+    `Companies/Firms category was prioritized as a key market indicator reflecting the sector's maturity and business ecosystem strength. Competition weights were adjusted lower considering the stable competitive landscape.`,
+    `Israeli Funding category received emphasis for local market assessment, reflecting the importance of domestic investment patterns. Knowledge Infrastructure was weighted higher due to its critical role in sector innovation and R&D capacity.`,
+    `Human Capital category received increased focus for talent development needs, recognizing the sector's reliance on skilled workforce. Academia weight was elevated to reflect the importance of academic partnerships and research collaboration.`,
+  ];
+  return explanations[Math.floor(Math.random() * explanations.length)];
+};
+
+// Generate explanation for participant (2 sentences, only shown if participant has values)
+const generateParticipantExplanation = (participantName: string): string => {
+  const explanations = [
+    `${participantName}'s weight distribution reflects extensive industry experience and deep market insights from hands-on work in the sector. The category weights were determined based on practical observations of what factors most significantly impact sector performance.`,
+    `Based on ${participantName}'s domain expertise, certain categories received higher priority due to their strategic relevance and observed correlation with successful outcomes. The weighting approach considers both current market trends and future projections from practical experience.`,
+    `${participantName}'s recommendations prioritize categories that have proven most influential in decision-making processes based on real-world experience. The distribution reflects a balanced approach considering multiple factors while emphasizing the most critical dimensions.`,
+  ];
+  return explanations[Math.floor(Math.random() * explanations.length)];
+};
+
+// Generate IIA default weights based on category distribution
+const generateIIADefaultWeights = (): Record<number, number> => {
+  const weights: Record<number, number> = {};
+  
+  Object.keys(CATEGORIES).forEach((categoryName) => {
+    const category = categoryName as CategoryName;
+    const categoryWeight = CATEGORIES[category].defaultWeight;
+    const categoryParams = getParameterIndicesByCategory(category);
+    const paramCount = categoryParams.length;
+    
+    if (paramCount > 0) {
+      const weightPerParam = categoryWeight / paramCount;
+      categoryParams.forEach((paramIndex) => {
+        // Round to 1 decimal place and ensure no negative
+        const rounded = Math.round(weightPerParam * 10) / 10;
+        weights[paramIndex] = Math.max(0, parseFloat(rounded.toFixed(1)));
+      });
+    }
+  });
+  
+  // Ensure sum is exactly 100
+  const total = Object.values(weights).reduce((sum, w) => sum + w, 0);
+  if (Math.abs(total - 100) > 0.05) {
+    const diff = 100 - total;
+    const lastParamIndex = parameters.length - 1;
+    const newValue = (weights[lastParamIndex] || 0) + diff;
+    weights[lastParamIndex] = Math.max(0, parseFloat(newValue.toFixed(1))); // Ensure no negative and 1 decimal
+  }
+  
+  // Final pass: ensure all values have exactly 1 decimal place and no negatives
+  Object.keys(weights).forEach((key) => {
+    const paramIndex = parseInt(key);
+    weights[paramIndex] = parseFloat(Math.max(0, weights[paramIndex]).toFixed(1));
+  });
+  
+  return weights;
+};
+
+// Generate LLM weights close to defaults but with variation (±10-15%)
+const generateLLMWeights = (): Record<number, number> => {
+  const weights: Record<number, number> = {};
+  const categoryWeights: Record<CategoryName, number> = {} as Record<CategoryName, number>;
+  
+  // Generate category weights with variation
+  Object.keys(CATEGORIES).forEach((categoryName) => {
+    const category = categoryName as CategoryName;
+    const defaultWeight = CATEGORIES[category].defaultWeight;
+    // Add ±10-15% variation
+    const variation = (Math.random() * 0.1 + 0.05) * (Math.random() > 0.5 ? 1 : -1);
+    categoryWeights[category] = Math.max(0, defaultWeight * (1 + variation));
+  });
+  
+  // Normalize category weights to sum to 100
+  const totalCategoryWeight = Object.values(categoryWeights).reduce((sum, w) => sum + w, 0);
+  Object.keys(categoryWeights).forEach((categoryName) => {
+    const category = categoryName as CategoryName;
+    categoryWeights[category] = (categoryWeights[category] / totalCategoryWeight) * 100;
+  });
+  
+  // Distribute weights to parameters within each category
+  Object.keys(CATEGORIES).forEach((categoryName) => {
+    const category = categoryName as CategoryName;
+    const categoryWeight = categoryWeights[category];
+    const categoryParams = getParameterIndicesByCategory(category);
+    const paramCount = categoryParams.length;
+    
+    if (paramCount > 0) {
+      const weightPerParam = categoryWeight / paramCount;
+      categoryParams.forEach((paramIndex) => {
+        // Round to 1 decimal place and ensure no negative
+        const rounded = Math.round(weightPerParam * 10) / 10;
+        weights[paramIndex] = Math.max(0, parseFloat(rounded.toFixed(1)));
+      });
+    }
+  });
+  
+  // Ensure sum is exactly 100
+  const total = Object.values(weights).reduce((sum, w) => sum + w, 0);
+  if (Math.abs(total - 100) > 0.05) {
+    const diff = 100 - total;
+    const lastParamIndex = parameters.length - 1;
+    const newValue = (weights[lastParamIndex] || 0) + diff;
+    weights[lastParamIndex] = Math.max(0, parseFloat(newValue.toFixed(1))); // Ensure no negative and 1 decimal
+  }
+  
+  // Final pass: ensure all values have exactly 1 decimal place
+  Object.keys(weights).forEach((key) => {
+    const paramIndex = parseInt(key);
+    weights[paramIndex] = parseFloat(Math.max(0, weights[paramIndex]).toFixed(1));
+  });
+  
+  return weights;
+};
 
 // Generate weights that sum to 100 for a column with relatively close values
 const generateWeightsForColumn = (): number[] => {
-  // Initialize all weights to null
-  const weights = Array.from({ length: parameters.length }, () => null as number | null);
+  const llmWeights = generateLLMWeights();
+  const weights: (number | null)[] = Array.from({ length: parameters.length }, () => null);
   
-  // Generate random numbers only for active parameters (between 0.5 and 1.5)
-  const random = ACTIVE_PARAMETER_INDICES.map(() => 0.5 + Math.random());
-  const sum = random.reduce((a, b) => a + b, 0);
-  
-  // Normalize to sum to 100 and round to integers
-  const normalized = random.map(r => Math.max(0, Math.round((r / sum) * 100)));
-  
-  // Adjust the last active parameter to ensure exact sum of 100
-  const currentSum = normalized.slice(0, -1).reduce((a, b) => a + b, 0);
-  const lastValue = 100 - currentSum;
-  normalized[normalized.length - 1] = Math.max(0, lastValue);
-  
-  // Assign weights only to active parameters
-  ACTIVE_PARAMETER_INDICES.forEach((paramIndex, i) => {
-    weights[paramIndex] = normalized[i];
+  Object.keys(llmWeights).forEach((paramIndexStr) => {
+    const paramIndex = parseInt(paramIndexStr);
+    weights[paramIndex] = llmWeights[paramIndex];
   });
   
   return weights as number[];
 };
 
-export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 50, formData, onClose }: WeightsTableProps) => {
+export const WeightsTable = ({ llms = [], participants = [], domains = [], initialLlmWeight = 50, formData, onClose }: WeightsTableProps) => {
+  // Early return if essential props are missing or invalid
+  if (!domains || domains.length === 0) {
+    return (
+      <Card className="mt-6 shadow-lg mx-auto w-full max-w-[95vw] p-8">
+        <div className="flex flex-col items-center justify-center h-64 space-y-4">
+          <p className="text-muted-foreground">No domains available</p>
+          <Button onClick={onClose} variant="outline">Close</Button>
+        </div>
+      </Card>
+    );
+  }
+
+  if (!llms || llms.length === 0) {
+    return (
+      <Card className="mt-6 shadow-lg mx-auto w-full max-w-[95vw] p-8">
+        <div className="flex flex-col items-center justify-center h-64 space-y-4">
+          <p className="text-muted-foreground">No LLMs available</p>
+          <Button onClick={onClose} variant="outline">Close</Button>
+        </div>
+      </Card>
+    );
+  }
+
   const { getButtonClasses } = useButtonColor();
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showParametersDialog, setShowParametersDialog] = useState(false);
@@ -144,68 +368,115 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
   // Always start with weights view when opening from History
   const [viewMode, setViewMode] = useState<'weights' | 'results'>('weights');
   
-  // Generate data for all domains (must be before userWeights)
-  const generateInitialDomainsData = () => {
-    const domainsData: Record<string, Record<number, Record<string, number | null>>> = {};
-    
-    domains.forEach((domain) => {
-      const rows: Record<number, Record<string, number | null>> = {};
-      
-      // Initialize rows
-      parameters.forEach((_, paramIndex) => {
-        rows[paramIndex] = {};
-      });
-      
-      // Generate weights only for LLMs
-      llms.forEach((llm) => {
-        const weights = generateWeightsForColumn();
-        weights.forEach((weight, paramIndex) => {
-          rows[paramIndex][llm] = weight;
-        });
-      });
-      
-      // Participants columns are empty (null)
-      participants.forEach((participant) => {
-        parameters.forEach((_, paramIndex) => {
-          rows[paramIndex][participant.name] = null;
-        });
-      });
-      
-      domainsData[domain] = rows;
+  // Track which categories are expanded (default: all closed)
+  const [expandedCategories, setExpandedCategories] = useState<Set<CategoryName>>(new Set());
+  
+  const toggleCategory = (category: CategoryName) => {
+    setExpandedCategories((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(category)) {
+        newSet.delete(category);
+      } else {
+        newSet.add(category);
+      }
+      return newSet;
     });
-    
-    return domainsData;
   };
   
-  const [allDomainsData, setAllDomainsData] = useState(generateInitialDomainsData);
+  // Generate data for all domains (must be before userWeights)
+  const generateInitialDomainsData = () => {
+    try {
+      const domainsData: Record<string, Record<number, Record<string, number | null>>> = {};
+      
+      if (!domains || domains.length === 0 || !llms || llms.length === 0) {
+        return domainsData;
+      }
+      
+      domains.forEach((domain) => {
+        const rows: Record<number, Record<string, number | null>> = {};
+        
+        // Initialize rows
+        parameters.forEach((_, paramIndex) => {
+          rows[paramIndex] = {};
+        });
+        
+        // Generate weights only for LLMs
+        llms.forEach((llm) => {
+          const weights = generateWeightsForColumn();
+          weights.forEach((weight, paramIndex) => {
+            if (rows[paramIndex]) {
+              rows[paramIndex][llm] = weight;
+            }
+          });
+        });
+        
+        // Participants columns are empty (null)
+        if (participants && participants.length > 0) {
+          participants.forEach((participant) => {
+            parameters.forEach((_, paramIndex) => {
+              if (rows[paramIndex]) {
+                rows[paramIndex][participant.name] = null;
+              }
+            });
+          });
+        }
+        
+        domainsData[domain] = rows;
+      });
+      
+      return domainsData;
+    } catch (error) {
+      console.error("Error generating initial domains data:", error);
+      return {};
+    }
+  };
+  
+  const [allDomainsData, setAllDomainsData] = useState(() => generateInitialDomainsData());
 
   // User's custom weights for each domain - will be initialized in useEffect
   const [userWeights, setUserWeights] = useState<Record<string, Record<number, number | null>>>({});
   
   // Store initial weights (IIA defaults) for reset functionality
   const [initialUserWeights, setInitialUserWeights] = useState<Record<string, Record<number, number | null>>>({});
+  
+  // Category weights for user adjustment
+  const [categoryWeights, setCategoryWeights] = useState<Record<string, Record<CategoryName, number>>>({});
+  
+  // LLM explanations for each LLM
+  const [llmExplanations, setLlmExplanations] = useState<Record<string, string>>({});
+  
+  // Participant explanations
+  const [participantExplanations, setParticipantExplanations] = useState<Record<string, string>>({});
 
-  const currentDomain = domains[currentDomainIndex] || domains[0] || "";
-  const data = allDomainsData[currentDomain] || {};
+  const currentDomain = (domains && domains.length > 0 && currentDomainIndex >= 0 && currentDomainIndex < domains.length) 
+    ? domains[currentDomainIndex] 
+    : (domains && domains.length > 0 ? domains[0] : "");
+  const data = (currentDomain && allDomainsData && allDomainsData[currentDomain]) ? allDomainsData[currentDomain] : {};
 
   // Initialize or reset state when component mounts or formData changes
   useEffect(() => {
-    if (savedState) {
+    const savedState = formData?.tableState;
+    
+    // Always ensure we have domain data
+    if (savedState?.allDomainsData) {
       // Load saved state for this specific run
-      if (savedState.allDomainsData) {
-        setAllDomainsData(savedState.allDomainsData);
-      } else {
-        setAllDomainsData(generateInitialDomainsData());
-      }
+      setAllDomainsData(savedState.allDomainsData);
+    } else {
+      // Generate fresh data if not available
+      setAllDomainsData(generateInitialDomainsData());
+    }
+    
+    if (savedState) {
       
       if (savedState.userWeights) {
         setUserWeights(savedState.userWeights);
         // Save initial weights for IIA reset
         setInitialUserWeights(savedState.userWeights);
       } else {
-        // Calculate initial userWeights from allDomainsData
+        // Calculate initial userWeights using IIA defaults
         const initUserWeights = () => {
           const weights: Record<string, Record<number, number | null>> = {};
+          const iiaDefaults = generateIIADefaultWeights();
           
           domains.forEach((domain) => {
             weights[domain] = {};
@@ -214,39 +485,11 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
               weights[domain][paramIndex] = null;
             });
             
-            // First pass: calculate averages only for active parameters
-            const averages: number[] = [];
-            ACTIVE_PARAMETER_INDICES.forEach((paramIndex) => {
-              // Calculate average of LLMs for this parameter
-              let llmSum = 0;
-              let llmCount = 0;
-              
-              llms.forEach((llm) => {
-                const value = (savedState.allDomainsData || allDomainsData)[domain]?.[paramIndex]?.[llm];
-                if (value !== null && value !== undefined) {
-                  llmSum += value;
-                  llmCount++;
-                }
-              });
-              
-              const llmAvg = llmCount > 0 ? llmSum / llmCount : 0;
-              averages.push(llmAvg);
+            // Assign IIA default weights
+            Object.keys(iiaDefaults).forEach((paramIndexStr) => {
+              const paramIndex = parseInt(paramIndexStr);
+              weights[domain][paramIndex] = iiaDefaults[paramIndex];
             });
-            
-            // Second pass: normalize to sum to 100 (only active parameters)
-            const sum = averages.reduce((a, b) => a + b, 0);
-            if (sum > 0) {
-              const normalized = averages.map(v => Math.round((v / sum) * 100));
-              
-              // Adjust the last active parameter to ensure exact sum of 100
-              const currentSum = normalized.slice(0, -1).reduce((a, b) => a + b, 0);
-              normalized[normalized.length - 1] = 100 - currentSum;
-              
-              // Assign weights only to active parameters
-              ACTIVE_PARAMETER_INDICES.forEach((paramIndex, i) => {
-                weights[domain][paramIndex] = normalized[i];
-              });
-            }
           });
           
           return weights;
@@ -258,8 +501,45 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
         setInitialUserWeights(initWeights);
       }
       
+      // Initialize category weights
+      if (savedState.categoryWeights) {
+        setCategoryWeights(savedState.categoryWeights);
+      } else {
+        const initCategoryWeights: Record<string, Record<CategoryName, number>> = {};
+        domains.forEach((domain) => {
+          initCategoryWeights[domain] = {} as Record<CategoryName, number>;
+          Object.keys(CATEGORIES).forEach((categoryName) => {
+            const category = categoryName as CategoryName;
+            initCategoryWeights[domain][category] = CATEGORIES[category].defaultWeight;
+          });
+        });
+        setCategoryWeights(initCategoryWeights);
+      }
+      
+      // Initialize explanations
+      if (savedState.llmExplanations) {
+        setLlmExplanations(savedState.llmExplanations);
+      } else {
+        const explanations: Record<string, string> = {};
+        llms.forEach((llm) => {
+          explanations[llm] = generateLLMExplanation(llm);
+        });
+        setLlmExplanations(explanations);
+      }
+      
+      if (savedState.participantExplanations) {
+        setParticipantExplanations(savedState.participantExplanations);
+      } else {
+        const participantExpls: Record<string, string> = {};
+        participants.forEach((p) => {
+          participantExpls[p.name] = generateParticipantExplanation(p.name);
+        });
+        setParticipantExplanations(participantExpls);
+      }
+      
       if (savedState.resultData) {
         setResultData(savedState.resultData);
+        setShowResultsTable(true);
       }
       if (savedState.llmWeight !== undefined) {
         setLlmWeight(savedState.llmWeight);
@@ -286,15 +566,17 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
       } else {
         setShowResultsTable(false);
       }
-      setViewMode('weights');
+      if (savedState.viewMode) {
+        setViewMode(savedState.viewMode);
+      } else {
+        setViewMode('weights');
+      }
     } else {
-      // No saved state, initialize fresh
-      const initDomainsData = generateInitialDomainsData();
-      setAllDomainsData(initDomainsData);
-      
-      // Calculate initial userWeights
+      // No saved state, but we already set allDomainsData above
+      // Calculate initial userWeights using IIA defaults
       const initUserWeights = () => {
         const weights: Record<string, Record<number, number | null>> = {};
+        const iiaDefaults = generateIIADefaultWeights();
         
         domains.forEach((domain) => {
           weights[domain] = {};
@@ -303,35 +585,11 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
             weights[domain][paramIndex] = null;
           });
           
-          // Calculate averages only for active parameters
-          const averages: number[] = [];
-          ACTIVE_PARAMETER_INDICES.forEach((paramIndex) => {
-            let llmSum = 0;
-            let llmCount = 0;
-            
-            llms.forEach((llm) => {
-              const value = initDomainsData[domain]?.[paramIndex]?.[llm];
-              if (value !== null && value !== undefined) {
-                llmSum += value;
-                llmCount++;
-              }
-            });
-            
-            const llmAvg = llmCount > 0 ? llmSum / llmCount : 0;
-            averages.push(llmAvg);
+          // Assign IIA default weights
+          Object.keys(iiaDefaults).forEach((paramIndexStr) => {
+            const paramIndex = parseInt(paramIndexStr);
+            weights[domain][paramIndex] = iiaDefaults[paramIndex];
           });
-          
-          const sum = averages.reduce((a, b) => a + b, 0);
-          if (sum > 0) {
-            const normalized = averages.map(v => Math.round((v / sum) * 100));
-            const currentSum = normalized.slice(0, -1).reduce((a, b) => a + b, 0);
-            normalized[normalized.length - 1] = 100 - currentSum;
-            
-            // Assign weights only to active parameters
-            ACTIVE_PARAMETER_INDICES.forEach((paramIndex, i) => {
-              weights[domain][paramIndex] = normalized[i];
-            });
-          }
         });
         
         return weights;
@@ -348,16 +606,41 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
       
       // Save initial weights for IIA reset
       setInitialUserWeights(initUserWeights());
+      
+      // Initialize category weights with defaults
+      const initCategoryWeights: Record<string, Record<CategoryName, number>> = {};
+      domains.forEach((domain) => {
+        initCategoryWeights[domain] = {} as Record<CategoryName, number>;
+        Object.keys(CATEGORIES).forEach((categoryName) => {
+          const category = categoryName as CategoryName;
+          initCategoryWeights[domain][category] = CATEGORIES[category].defaultWeight;
+        });
+      });
+      setCategoryWeights(initCategoryWeights);
+      
+      // Generate explanations for LLMs
+      const explanations: Record<string, string> = {};
+      llms.forEach((llm) => {
+        explanations[llm] = generateLLMExplanation(llm);
+      });
+      setLlmExplanations(explanations);
+      
+      // Generate explanations for participants
+      const participantExpls: Record<string, string> = {};
+      participants.forEach((p) => {
+        participantExpls[p.name] = generateParticipantExplanation(p.name);
+      });
+      setParticipantExplanations(participantExpls);
     }
   }, [formData?.id, llms.length, participants.length, domains.length]); // Re-run when data structure changes
 
   // Function to set equal weights (Equal distribution)
   const handleEqualWeights = () => {
-    // Calculate equal weight per active parameter (with one decimal place)
-    const activeParamsCount = ACTIVE_PARAMETER_INDICES.length;
-    const equalWeightPerParam = Math.round((100 / activeParamsCount) * 10) / 10;
-    const totalFromEqual = equalWeightPerParam * activeParamsCount;
-    const remainder = Math.round((100 - totalFromEqual) * 10) / 10;
+    // Calculate equal weight per parameter (with one decimal place)
+    const paramCount = parameters.length;
+    const equalWeightPerParam = parseFloat((100 / paramCount).toFixed(1));
+    const totalFromEqual = equalWeightPerParam * paramCount;
+    const remainder = parseFloat((100 - totalFromEqual).toFixed(1));
     
     setUserWeights((prevWeights) => {
       const newWeights = { ...prevWeights };
@@ -369,73 +652,130 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
           newWeights[domain][paramIndex] = null;
         });
         
-        // Set equal weights only for active parameters
-        ACTIVE_PARAMETER_INDICES.forEach((paramIndex, i) => {
-          // Last active parameter gets the remainder to ensure sum is exactly 100.0
-          if (i === ACTIVE_PARAMETER_INDICES.length - 1) {
-            newWeights[domain][paramIndex] = Math.round((equalWeightPerParam + remainder) * 10) / 10;
+        // Set equal weights for all parameters
+        parameters.forEach((_, paramIndex) => {
+          // Last parameter gets the remainder to ensure sum is exactly 100.0
+          if (paramIndex === parameters.length - 1) {
+            const lastValue = parseFloat((equalWeightPerParam + remainder).toFixed(1));
+            newWeights[domain][paramIndex] = Math.max(0, lastValue); // Ensure no negative
           } else {
-            newWeights[domain][paramIndex] = equalWeightPerParam;
+            newWeights[domain][paramIndex] = Math.max(0, equalWeightPerParam); // Ensure no negative
           }
+          // Ensure exactly 1 decimal place
+          newWeights[domain][paramIndex] = parseFloat((newWeights[domain][paramIndex] || 0).toFixed(1));
         });
       });
       
       return newWeights;
     });
+    
+    // Update category weights to reflect equal distribution
+    setCategoryWeights((prev) => {
+      const newWeights = { ...prev };
+      domains.forEach((domain) => {
+        newWeights[domain] = {} as Record<CategoryName, number>;
+        Object.keys(CATEGORIES).forEach((categoryName) => {
+          const category = categoryName as CategoryName;
+          const categoryParams = getParameterIndicesByCategory(category);
+          const categoryWeight = parseFloat((equalWeightPerParam * categoryParams.length).toFixed(1));
+          newWeights[domain][category] = Math.max(0, categoryWeight); // Ensure no negative
+        });
+      });
+      return newWeights;
+    });
+  };
+
+  // Function to update category weight and redistribute to parameters
+  const handleCategoryWeightChange = (category: CategoryName, newWeight: number) => {
+    // Ensure no negative values, clamp between 0 and 100, round to 1 decimal place
+    const clampedWeight = Math.max(0, Math.min(100, newWeight));
+    const roundedWeight = Math.round(clampedWeight * 10) / 10;
+    const finalWeight = parseFloat(roundedWeight.toFixed(1));
+    
+    setCategoryWeights((prev) => {
+      const newCategoryWeights = { ...prev };
+      if (!newCategoryWeights[currentDomain]) {
+        newCategoryWeights[currentDomain] = {} as Record<CategoryName, number>;
+      }
+      newCategoryWeights[currentDomain][category] = finalWeight;
+      
+      // Redistribute weight to all parameters in this category
+      const categoryParams = getParameterIndicesByCategory(category);
+      const paramCount = categoryParams.length;
+      
+      if (paramCount > 0) {
+        const weightPerParam = parseFloat((finalWeight / paramCount).toFixed(1));
+        
+        setUserWeights((prevWeights) => {
+          const newWeights = { ...prevWeights };
+          if (!newWeights[currentDomain]) {
+            newWeights[currentDomain] = {};
+          }
+          
+          categoryParams.forEach((paramIndex, idx) => {
+            // Last parameter gets the remainder to ensure sum equals category weight
+            if (idx === categoryParams.length - 1) {
+              const currentSum = categoryParams.slice(0, -1).reduce((sum, pIdx) => {
+                return sum + (parseFloat((newWeights[currentDomain][pIdx] || 0).toFixed(1)));
+              }, 0);
+              const remainder = parseFloat((finalWeight - currentSum).toFixed(1));
+              newWeights[currentDomain][paramIndex] = Math.max(0, remainder); // Ensure no negative
+            } else {
+              newWeights[currentDomain][paramIndex] = Math.max(0, weightPerParam); // Ensure no negative
+            }
+            // Ensure exactly 1 decimal place
+            newWeights[currentDomain][paramIndex] = parseFloat((newWeights[currentDomain][paramIndex] || 0).toFixed(1));
+          });
+          
+          return newWeights;
+        });
+      }
+      
+      return newCategoryWeights;
+    });
   };
 
   // Function to reset to initial weights (IIA defaults)
   const handleResetToIIA = () => {
-    if (Object.keys(initialUserWeights).length > 0) {
-      setUserWeights(JSON.parse(JSON.stringify(initialUserWeights)));
-    } else {
-      // Recalculate initial weights if not saved
-      const recalcWeights = () => {
-        const weights: Record<string, Record<number, number | null>> = {};
-        
-        domains.forEach((domain) => {
-          weights[domain] = {};
-          // Initialize all to null first
-          parameters.forEach((_, paramIndex) => {
-            weights[domain][paramIndex] = null;
-          });
-          
-          // Calculate averages only for active parameters
-          const averages: number[] = [];
-          ACTIVE_PARAMETER_INDICES.forEach((paramIndex) => {
-            let llmSum = 0;
-            let llmCount = 0;
-            
-            llms.forEach((llm) => {
-              const value = allDomainsData[domain]?.[paramIndex]?.[llm];
-              if (value !== null && value !== undefined) {
-                llmSum += value;
-                llmCount++;
-              }
-            });
-            
-            const llmAvg = llmCount > 0 ? llmSum / llmCount : 0;
-            averages.push(llmAvg);
-          });
-          
-          const sum = averages.reduce((a, b) => a + b, 0);
-          if (sum > 0) {
-            const normalized = averages.map(v => Math.round((v / sum) * 100));
-            const currentSum = normalized.slice(0, -1).reduce((a, b) => a + b, 0);
-            normalized[normalized.length - 1] = 100 - currentSum;
-            
-            // Assign weights only to active parameters
-            ACTIVE_PARAMETER_INDICES.forEach((paramIndex, i) => {
-              weights[domain][paramIndex] = normalized[i];
-            });
-          }
+    const iiaDefaults = generateIIADefaultWeights();
+    // Ensure all values have exactly 1 decimal place and no negatives
+    Object.keys(iiaDefaults).forEach((key) => {
+      const paramIndex = parseInt(key);
+      iiaDefaults[paramIndex] = parseFloat(Math.max(0, iiaDefaults[paramIndex]).toFixed(1));
+    });
+    
+    setUserWeights((prevWeights) => {
+      const newWeights = { ...prevWeights };
+      
+      domains.forEach((domain) => {
+        newWeights[domain] = {};
+        // Initialize all to null first
+        parameters.forEach((_, paramIndex) => {
+          newWeights[domain][paramIndex] = null;
         });
         
-        return weights;
-      };
+        // Assign IIA default weights
+        Object.keys(iiaDefaults).forEach((paramIndexStr) => {
+          const paramIndex = parseInt(paramIndexStr);
+          newWeights[domain][paramIndex] = iiaDefaults[paramIndex];
+        });
+      });
       
-      setUserWeights(recalcWeights());
-    }
+      return newWeights;
+    });
+    
+    // Reset category weights to defaults
+    setCategoryWeights((prev) => {
+      const newWeights = { ...prev };
+      domains.forEach((domain) => {
+        newWeights[domain] = {} as Record<CategoryName, number>;
+        Object.keys(CATEGORIES).forEach((categoryName) => {
+          const category = categoryName as CategoryName;
+          newWeights[domain][category] = CATEGORIES[category].defaultWeight;
+        });
+      });
+      return newWeights;
+    });
   };
 
   // Auto-save table state to localStorage whenever it changes
@@ -453,6 +793,9 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
           isMeDisabled,
           showResultsTable,
           viewMode: 'weights' as const, // Always save as weights to start there next time
+          categoryWeights,
+          llmExplanations,
+          participantExplanations,
         };
         
         await updateRunTableState(session.username, formData.id, tableState);
@@ -469,7 +812,10 @@ export const WeightsTable = ({ llms, participants, domains, initialLlmWeight = 5
     disabledParticipants,
     isMeDisabled,
     showResultsTable,
-    formData
+    formData,
+    categoryWeights,
+    llmExplanations,
+    participantExplanations,
   ]);
 
   // Refresh participants data with new random weights (only for participants with no data)
@@ -550,17 +896,16 @@ Best regards`);
 
   // Handle user weight change
   const handleUserWeightChange = (paramIndex: number, value: string) => {
-    // Only allow changes for active parameters
-    if (!ACTIVE_PARAMETER_INDICES.includes(paramIndex)) {
-      return;
-    }
-    
-    // Parse as float to support decimals, clamp between 0 and 100
+    // Parse as float to support decimals, clamp between 0 and 100, ensure no negatives
     let numValue: number | null = null;
     if (value !== "" && value !== "-" && value !== ".") {
       const parsed = parseFloat(value);
       if (!isNaN(parsed)) {
-        numValue = Math.max(0, Math.min(100, Math.round(parsed * 10) / 10)); // Round to 1 decimal place
+        // Ensure no negative values, clamp between 0 and 100, round to 1 decimal place
+        const clamped = Math.max(0, Math.min(100, parsed));
+        numValue = Math.round(clamped * 10) / 10;
+        // Ensure exactly 1 decimal place (fix floating point issues)
+        numValue = parseFloat(numValue.toFixed(1));
       }
     }
     setUserWeights((prev) => ({
@@ -573,9 +918,10 @@ Best regards`);
   };
 
   // Calculate user's total for validation (only active parameters)
+  // Calculate total of user weights (sum all parameters)
   const calculateUserTotal = (): number => {
     if (!userWeights[currentDomain]) return 0;
-    return ACTIVE_PARAMETER_INDICES.reduce((sum, paramIndex) => {
+    return parameters.reduce((sum, _, paramIndex) => {
       const value = userWeights[currentDomain][paramIndex];
       return sum + (value || 0);
     }, 0);
@@ -766,8 +1112,8 @@ Best regards`);
       const domainSeed = domain.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
       const domainMultiplier = 0.8 + (domainSeed % 40) / 100; // 0.8 to 1.2
       
-      // Generate results only for active parameters
-      ACTIVE_PARAMETER_INDICES.forEach((paramIndex) => {
+      // Generate results for all parameters
+      parameters.forEach((_, paramIndex) => {
         // Get the final weight for this domain and parameter
         const finalWeight = calculateFinalWeightForDomain(domain, paramIndex);
         const weightInfluence = finalWeight / 10; // 0-10 range
@@ -859,8 +1205,41 @@ Best regards`);
     setViewMode('results');
   };
 
+  // Ensure userWeights is initialized for currentDomain
+  useEffect(() => {
+    if (currentDomain && !userWeights[currentDomain]) {
+      // Initialize userWeights for current domain if not exists
+      setUserWeights((prev) => {
+        const newWeights = { ...prev };
+        if (!newWeights[currentDomain]) {
+          newWeights[currentDomain] = {};
+          parameters.forEach((_, paramIndex) => {
+            newWeights[currentDomain][paramIndex] = null;
+          });
+          // Set IIA defaults
+          const iiaDefaults = generateIIADefaultWeights();
+          Object.keys(iiaDefaults).forEach((paramIndexStr) => {
+            const paramIndex = parseInt(paramIndexStr);
+            newWeights[currentDomain][paramIndex] = iiaDefaults[paramIndex];
+          });
+        }
+        return newWeights;
+      });
+    }
+  }, [currentDomain]);
+
   // Don't render if essential data is not loaded yet
-  if (!currentDomain || Object.keys(data).length === 0 || Object.keys(userWeights).length === 0 || !userWeights[currentDomain]) {
+  if (domains.length === 0) {
+    return (
+      <Card className="mt-6 shadow-lg mx-auto w-full max-w-[95vw] p-8">
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">No domains available</p>
+        </div>
+      </Card>
+    );
+  }
+
+  if (!currentDomain || Object.keys(data).length === 0) {
     return (
       <Card className="mt-6 shadow-lg mx-auto w-full max-w-[95vw] p-8">
         <div className="flex items-center justify-center h-64">
@@ -986,14 +1365,21 @@ Best regards`);
         <CardContent>
           {viewMode === 'weights' && (
           <>
-          <div className="overflow-x-auto flex justify-center">
-            <table className="border-collapse">
+          <div className="overflow-x-auto">
+            <table className="border-collapse mx-auto" style={{ width: '100%', maxWidth: '100%', tableLayout: 'auto' }}>
               <thead>
                 <tr className="border-b-2 border-border">
-                  <th className="text-center p-3 font-semibold text-foreground bg-background whitespace-nowrap">
+                  <th className="text-center p-2 font-semibold text-foreground bg-background whitespace-nowrap" style={{ width: 'auto', minWidth: '150px', maxWidth: '200px' }}>
                     Parameter
                   </th>
-                  <th className={`text-center p-2 font-semibold whitespace-nowrap ${isMeDisabled ? 'text-muted-foreground bg-muted/30' : 'text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-950'}`}>
+                  <th className={`text-center p-1.5 font-semibold whitespace-nowrap ${isMeDisabled ? 'text-muted-foreground bg-muted/30' : ''}`} style={{ 
+                    width: 'auto', 
+                    minWidth: '100px',
+                    ...(isMeDisabled ? {} : {
+                      color: `hsl(var(--primary))`,
+                      backgroundColor: `var(--primary-ghost-hex)`,
+                    })
+                  }}>
                     <div className="flex flex-col items-center gap-1">
                       <div className="flex items-center gap-1">
                         <span className="font-bold">YOU</span>
@@ -1031,9 +1417,28 @@ Best regards`);
                   {llms.map((llm, idx) => {
                     const isDisabled = disabledLlms.has(llm);
                     return (
-                      <th key={idx} className={`text-center p-2 font-semibold whitespace-nowrap ${isDisabled ? 'text-muted-foreground bg-muted/30' : 'text-foreground'}`}>
+                      <th key={idx} className={`text-center p-1.5 font-semibold whitespace-nowrap ${isDisabled ? 'text-muted-foreground bg-muted/30' : 'text-foreground'}`} style={{ width: 'auto', minWidth: '100px' }}>
                         <div className="flex flex-col items-center gap-1">
-                          <span>{llm}</span>
+                          <div className="flex items-center gap-1">
+                            <span>{llm}</span>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-4 w-4"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <HelpCircle className="h-3 w-3" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="max-w-md">
+                                  <p className="break-words whitespace-pre-line">{llmExplanations[llm] || "No explanation available."}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1048,11 +1453,36 @@ Best regards`);
                   })}
                   {participants.map((participant, idx) => {
                     const isDisabled = disabledParticipants.has(participant.name);
+                    // Check if participant has any values entered
+                    const hasValues = parameters.some((_, paramIndex) => {
+                      const value = data[paramIndex]?.[participant.name];
+                      return value !== null && value !== undefined;
+                    });
+                    
                     return (
-                      <th key={`participant-${idx}`} className={`text-center p-2 font-semibold whitespace-nowrap ${isDisabled ? 'text-muted-foreground bg-muted/30' : 'text-foreground'}`}>
+                      <th key={`participant-${idx}`} className={`text-center p-1.5 font-semibold whitespace-nowrap ${isDisabled ? 'text-muted-foreground bg-muted/30' : 'text-foreground'}`} style={{ width: 'auto', minWidth: '120px' }}>
                         <div className="flex flex-col items-center gap-1">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
                             <span>{participant.name}</span>
+                            {hasValues && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-4 w-4"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <HelpCircle className="h-3 w-3" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom" className="max-w-md">
+                                    <p className="break-words whitespace-pre-line">{participantExplanations[participant.name] || "No explanation available."}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
@@ -1074,77 +1504,163 @@ Best regards`);
                       </th>
                     );
                   })}
-                  <th className="text-center p-2 font-semibold text-foreground bg-primary/10 whitespace-nowrap">
+                  <th className="text-center p-1.5 font-semibold text-foreground bg-primary/10 whitespace-nowrap" style={{ width: 'auto', minWidth: '100px' }}>
                     Final Weight
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {parameters.map((param, paramIndex) => (
-                  <tr key={paramIndex} className="border-b border-border hover:bg-accent/50 transition-colors">
-                    <td className="p-2 bg-background text-center whitespace-nowrap">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="font-medium text-foreground cursor-help text-sm">
-                              {param.short}
+                {Object.keys(CATEGORIES).map((categoryName) => {
+                  const category = categoryName as CategoryName;
+                  const categoryParams = getParameterIndicesByCategory(category);
+                  const categoryWeight = categoryWeights[currentDomain]?.[category] || CATEGORIES[category].defaultWeight;
+                  
+                  return (
+                    <Fragment key={category}>
+                      {/* Category header row */}
+                      <tr className="border-b-2 border-border bg-accent/60 hover:bg-accent/70 font-semibold cursor-pointer transition-colors shadow-sm" onClick={() => toggleCategory(category)}>
+                        <td className="p-2 bg-background text-center whitespace-nowrap" style={{ width: 'auto', minWidth: '150px', maxWidth: '200px' }}>
+                          <div className="flex items-center justify-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleCategory(category);
+                              }}
+                            >
+                              {expandedCategories.has(category) ? (
+                                <ChevronUp className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <span className="text-base font-bold">{category}</span>
+                            <span className="text-xs text-muted-foreground font-normal">
+                              ({categoryParams.length})
                             </span>
-                          </TooltipTrigger>
-                          <TooltipContent side="right" className="max-w-md">
-                            <p className="break-words">{param.full}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </td>
-                    <td className={`p-2 ${isMeDisabled ? 'bg-muted/30' : 'bg-blue-100/70 dark:bg-blue-950/70'}`}>
-                      <div className="flex justify-center items-center">
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          value={userWeights[currentDomain]?.[paramIndex] !== null && userWeights[currentDomain]?.[paramIndex] !== undefined ? userWeights[currentDomain][paramIndex]!.toFixed(1) : ""}
-                          onChange={(e) => handleUserWeightChange(paramIndex, e.target.value)}
-                          className={`w-20 h-8 text-center text-sm font-semibold ${isMeDisabled ? 'opacity-50' : 'border-blue-300 dark:border-blue-700'} ${!ACTIVE_PARAMETER_INDICES.includes(paramIndex) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          placeholder="-"
-                          disabled={isMeDisabled || !ACTIVE_PARAMETER_INDICES.includes(paramIndex)}
-                        />
-                      </div>
-                    </td>
-                    {llms.map((llm, colIndex) => {
-                      const isDisabled = disabledLlms.has(llm);
-                      return (
-                        <td key={colIndex} className={`text-center p-2 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : 'text-foreground'}`}>
-                          {data[paramIndex][llm]}
+                          </div>
                         </td>
-                      );
-                    })}
-                    {participants.map((participant, colIndex) => {
-                      const value = data[paramIndex][participant.name];
-                      const isDisabled = disabledParticipants.has(participant.name);
-                      return (
-                        <td key={`participant-${colIndex}`} className={`text-center p-2 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : ''}`}>
-                          {value !== null && value !== undefined ? (
-                            <span className={isDisabled ? 'text-muted-foreground' : 'text-foreground'}>{value}</span>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
+                        <td className={`p-1.5 ${isMeDisabled ? 'bg-muted/30' : ''}`} style={isMeDisabled ? {} : { backgroundColor: `var(--primary-ghost-hex)` }} onClick={(e) => e.stopPropagation()}>
+                          <div className="flex flex-col items-center gap-1">
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.1"
+                              value={categoryWeight.toFixed(1)}
+                              onChange={(e) => handleCategoryWeightChange(category, parseFloat(e.target.value) || 0)}
+                              className="w-18 h-7 text-center text-xs font-semibold"
+                              style={isMeDisabled ? {} : { borderColor: `var(--primary-hex)` }}
+                              disabled={isMeDisabled}
+                            />
+                          </div>
                         </td>
-                      );
-                    })}
-                    <td className="text-center p-2 text-foreground text-sm font-semibold bg-primary/5">
-                      {calculateFinalWeight(paramIndex).toFixed(1)}
-                    </td>
-                  </tr>
-                ))}
+                        {/* LLM category totals */}
+                        {llms.map((llm, llmIdx) => {
+                          const isDisabled = disabledLlms.has(llm);
+                          const categoryTotal = categoryParams.reduce((sum, paramIndex) => {
+                            const value = data[paramIndex][llm];
+                            return sum + (value !== null && value !== undefined ? value : 0);
+                          }, 0);
+                          return (
+                            <td key={`llm-cat-${llmIdx}`} className={`text-center p-1.5 text-sm font-semibold ${isDisabled ? 'bg-muted/30 text-muted-foreground' : 'text-foreground'}`}>
+                              {categoryTotal.toFixed(1)}
+                            </td>
+                          );
+                        })}
+                        {/* Participant category totals */}
+                        {participants.map((participant, partIdx) => {
+                          const isDisabled = disabledParticipants.has(participant.name);
+                          const categoryTotal = categoryParams.reduce((sum, paramIndex) => {
+                            const value = data[paramIndex][participant.name];
+                            return sum + (value !== null && value !== undefined ? value : 0);
+                          }, 0);
+                          const hasData = categoryParams.some((paramIndex) => data[paramIndex][participant.name] !== null);
+                          return (
+                            <td key={`participant-cat-${partIdx}`} className={`text-center p-1.5 text-sm font-semibold ${isDisabled ? 'bg-muted/30 text-muted-foreground' : ''}`}>
+                              {hasData ? categoryTotal.toFixed(1) : '-'}
+                            </td>
+                          );
+                        })}
+                        <td className="text-center p-1.5 text-foreground text-sm font-semibold bg-primary/5">
+                          {categoryParams.reduce((sum, paramIndex) => sum + calculateFinalWeight(paramIndex), 0).toFixed(1)}
+                        </td>
+                      </tr>
+                      {/* Parameters in this category - only show if expanded */}
+                      {expandedCategories.has(category) && categoryParams.map((paramIndex) => {
+                        const param = parameters[paramIndex];
+                        return (
+                          <tr key={paramIndex} className="border-b border-border hover:bg-accent/50 transition-colors">
+                            <td className="p-2 bg-background text-center whitespace-nowrap" style={{ width: 'auto', minWidth: '150px', maxWidth: '200px' }}>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="font-medium text-foreground cursor-help text-sm">
+                                      {param.short}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="right" className="max-w-md">
+                                    <p className="break-words">{param.full}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </td>
+                            <td className={`p-1.5 ${isMeDisabled ? 'bg-muted/30' : ''}`} style={isMeDisabled ? {} : { backgroundColor: `var(--primary-ghost-hex)` }}>
+                              <div className="flex justify-center items-center">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="0.1"
+                                  value={userWeights[currentDomain]?.[paramIndex] !== null && userWeights[currentDomain]?.[paramIndex] !== undefined ? userWeights[currentDomain][paramIndex]!.toFixed(1) : ""}
+                                  onChange={(e) => handleUserWeightChange(paramIndex, e.target.value)}
+                                  className={`w-16 h-7 text-center text-xs font-semibold ${isMeDisabled ? 'opacity-50' : ''}`}
+                                  style={isMeDisabled ? {} : { borderColor: `var(--primary-hex)` }}
+                                  placeholder="-"
+                                  disabled={isMeDisabled}
+                                />
+                              </div>
+                            </td>
+                            {llms.map((llm, colIndex) => {
+                              const isDisabled = disabledLlms.has(llm);
+                              return (
+                                <td key={colIndex} className={`text-center p-1.5 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : 'text-foreground'}`}>
+                                  {data[paramIndex][llm]}
+                                </td>
+                              );
+                            })}
+                            {participants.map((participant, colIndex) => {
+                              const value = data[paramIndex][participant.name];
+                              const isDisabled = disabledParticipants.has(participant.name);
+                              return (
+                                <td key={`participant-${colIndex}`} className={`text-center p-1.5 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : ''}`}>
+                                  {value !== null && value !== undefined ? (
+                                    <span className={isDisabled ? 'text-muted-foreground' : 'text-foreground'}>{value}</span>
+                                  ) : (
+                                    <span className="text-muted-foreground">-</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            <td className="text-center p-1.5 text-foreground text-sm font-semibold bg-primary/5">
+                              {calculateFinalWeight(paramIndex).toFixed(1)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </Fragment>
+                  );
+                })}
                 <tr className="border-t-2 border-border font-semibold bg-accent/30">
-                  <td className="p-2 bg-background text-center whitespace-nowrap">Total</td>
-                  <td className={`text-center p-2 text-sm font-semibold ${
+                  <td className="p-1.5 bg-background text-center whitespace-nowrap">Total</td>
+                  <td className={`text-center p-1.5 text-sm font-semibold ${
                     isMeDisabled 
                       ? 'bg-muted/30 text-muted-foreground' 
-                      : 'bg-blue-100/70 dark:bg-blue-950/70 text-blue-700 dark:text-blue-400'
+                      : ''
                   } ${
-                    !isMeDisabled && calculateUserTotal() !== 100 && calculateUserTotal() > 0
+                    !isMeDisabled && Math.abs(calculateUserTotal() - 100) > 0.05 && calculateUserTotal() > 0
                       ? "text-red-600 dark:text-red-400"
                       : ""
                   }`}>
@@ -1160,7 +1676,7 @@ Best regards`);
                     }, 0);
                     const isDisabled = disabledLlms.has(llm);
                     return (
-                      <td key={idx} className={`text-center p-2 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : 'text-foreground'}`}>
+                      <td key={idx} className={`text-center p-1.5 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : 'text-foreground'}`}>
                         {Math.round(sum)}
                       </td>
                     );
@@ -1173,7 +1689,7 @@ Best regards`);
                     const hasData = parameters.some((_, paramIndex) => data[paramIndex][participant.name] !== null);
                     const isDisabled = disabledParticipants.has(participant.name);
                     return (
-                      <td key={`participant-total-${idx}`} className={`text-center p-2 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : ''}`}>
+                      <td key={`participant-total-${idx}`} className={`text-center p-1.5 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : ''}`}>
                         {hasData ? (
                           <span className={`font-semibold ${isDisabled ? 'text-muted-foreground' : 'text-foreground'}`}>{Math.round(sum)}</span>
                         ) : (
@@ -1182,13 +1698,27 @@ Best regards`);
                       </td>
                     );
                   })}
-                  <td className="text-center p-2 text-foreground text-sm font-semibold bg-primary/10">
+                  <td className="text-center p-1.5 text-foreground text-sm font-semibold bg-primary/10">
                     {parameters.reduce((sum, _, paramIndex) => sum + calculateFinalWeight(paramIndex), 0).toFixed(1)}
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
+          
+          {/* Confirm button at bottom */}
+          {!showResultsTable && (
+            <div className="mt-6 pt-6 border-t border-border flex justify-end">
+              <Button 
+                onClick={handleConfirmWeights}
+                className="bg-green-600 hover:bg-green-700 text-white"
+                size="lg"
+              >
+                <CheckCircle className="h-5 w-5 mr-2" />
+                Confirm
+              </Button>
+            </div>
+          )}
           
           {/* Weight Slider */}
           <div className="mt-6 pt-6 border-t border-border">
@@ -1234,56 +1764,109 @@ Best regards`);
           )}
 
           {viewMode === 'results' && showResultsTable && (
-            <div className="overflow-x-auto flex justify-center">
-              <table className="border-collapse">
+            <div className="overflow-x-auto">
+              <table className="border-collapse mx-auto" style={{ width: '100%', maxWidth: '100%', tableLayout: 'auto' }}>
                 <thead>
                   <tr className="border-b-2 border-border">
-                    <th className="text-center p-3 font-semibold text-foreground bg-background whitespace-nowrap">
+                    <th className="text-center p-2 font-semibold text-foreground bg-background whitespace-nowrap" style={{ width: 'auto', minWidth: '150px', maxWidth: '200px' }}>
                       Parameter
                     </th>
                     {domains.map((domain, idx) => (
-                      <th key={idx} className="text-center p-2 font-semibold text-foreground whitespace-nowrap">
+                      <th key={idx} className="text-center p-2 font-semibold text-foreground whitespace-nowrap" style={{ width: 'auto', minWidth: '150px' }}>
                         {domain}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {ACTIVE_PARAMETER_INDICES.map((paramIndex) => {
-                    const param = parameters[paramIndex];
+                  {Object.keys(CATEGORIES).map((categoryName) => {
+                    const category = categoryName as CategoryName;
+                    const categoryParams = getParameterIndicesByCategory(category);
+                    
                     return (
-                      <tr key={paramIndex} className="border-b border-border hover:bg-accent/50 transition-colors">
-                        <td className="p-2 bg-background text-center whitespace-nowrap">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="font-medium text-foreground cursor-help text-sm">
-                                  {param.short}
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent side="right" className="max-w-md">
-                                <p className="break-words">{param.full}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </td>
-                        {domains.map((domain, domainIdx) => {
-                          const value = resultData[domain]?.[paramIndex];
+                      <Fragment key={category}>
+                        {/* Category header row */}
+                        <tr className="border-b-2 border-border bg-accent/60 hover:bg-accent/70 font-semibold cursor-pointer transition-colors shadow-sm" onClick={() => toggleCategory(category)}>
+                          <td className="p-2 bg-background text-center whitespace-nowrap" style={{ width: 'auto', minWidth: '150px', maxWidth: '200px' }}>
+                            <div className="flex items-center justify-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-5 w-5"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleCategory(category);
+                                }}
+                              >
+                                {expandedCategories.has(category) ? (
+                                  <ChevronUp className="h-4 w-4" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <span className="text-base font-bold text-foreground">{category}</span>
+                              <span className="text-xs text-muted-foreground font-normal">
+                                ({categoryParams.length})
+                              </span>
+                            </div>
+                          </td>
+                          {domains.map((domain, domainIdx) => {
+                            // Check if category has any data
+                            const hasData = categoryParams.some((paramIndex) => 
+                              resultData[domain]?.[paramIndex] !== null && 
+                              resultData[domain]?.[paramIndex] !== undefined
+                            );
+                            
+                            return (
+                              <td key={domainIdx} className="text-center p-2 text-foreground text-sm font-semibold bg-green-50 dark:bg-green-950/30">
+                                {hasData ? (
+                                  <span className="text-muted-foreground">—</span>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                        {/* Parameters in this category - only show if expanded */}
+                        {expandedCategories.has(category) && categoryParams.map((paramIndex) => {
+                          const param = parameters[paramIndex];
                           return (
-                            <td key={domainIdx} className="text-center p-2 text-foreground text-sm font-semibold bg-green-50 dark:bg-green-950/30">
-                              {(() => {
-                                if (value === undefined || value === null) return "-";
-                                
-                                // Format based on parameter type
-                                if (paramIndex === 8) return `${value}%`; // Ratio percentage
-                                if (paramIndex === 9) return value.toFixed(2); // New Blood Flow (decimal)
-                                if (paramIndex === 10) return `${value} yrs`; // Average age in years
-                                return Math.round(value).toString(); // Whole numbers for counts
-                              })()}
-                            </td>
+                            <tr key={paramIndex} className="border-b border-border hover:bg-accent/50 transition-colors">
+                              <td className="p-2 bg-background text-center whitespace-nowrap" style={{ width: 'auto', minWidth: '150px', maxWidth: '200px' }}>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="font-medium text-foreground cursor-help text-sm">
+                                        {param.short}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" className="max-w-md">
+                                      <p className="break-words">{param.full}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </td>
+                              {domains.map((domain, domainIdx) => {
+                                const value = resultData[domain]?.[paramIndex];
+                                return (
+                                  <td key={domainIdx} className="text-center p-2 text-foreground text-sm font-semibold bg-green-50 dark:bg-green-950/30">
+                                    {(() => {
+                                      if (value === undefined || value === null) return "-";
+                                      
+                                      // Format based on parameter type
+                                      if (paramIndex === 8) return `${value}%`; // Ratio percentage
+                                      if (paramIndex === 9) return value.toFixed(2); // New Blood Flow (decimal)
+                                      if (paramIndex === 10) return `${value} yrs`; // Average age in years
+                                      return Math.round(value).toString(); // Whole numbers for counts
+                                    })()}
+                                  </td>
+                                );
+                              })}
+                            </tr>
                           );
                         })}
-                      </tr>
+                      </Fragment>
                     );
                   })}
                 </tbody>

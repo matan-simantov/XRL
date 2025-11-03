@@ -15,10 +15,11 @@ All colors MUST be HSL.
     --muted-text: #6B7280;
     --border-hex: #E8EAF0;
 
-    --primary-hex: #7A6FF0;
-    --primary-strong-hex: #5E54E8;
-    --primary-ghost-hex: #ECEBFF;
-    --primary-chip-hex: #E6E4FF;
+    /* Default blue theme (will be overridden by useThemeColor hook) */
+    --primary-hex: #3B82F6;
+    --primary-strong-hex: #2563EB;
+    --primary-ghost-hex: #DBEAFE;
+    --primary-chip-hex: #EFF6FF;
     --background: 248 30% 98%;
     --foreground: 0 0% 13%;
 
@@ -45,7 +46,7 @@ All colors MUST be HSL.
 
     --border: 240 6% 90%;
     --input: 240 6% 90%;
-    --ring: 258 90% 66%;
+    --ring: 217 91% 60%;
 
     --radius: 1rem;
     

@@ -92,23 +92,34 @@ const NewForm = () => {
     (async () => {
       const username = getSession()?.username;
       if (!username) return;
-      const latest = await (await import("@/lib/storage")).loadLatestDraft(username);
-      if (latest?.state) {
-        const parsed = latest.state;
-        if (parsed.domain && !parsed.domains) {
-          parsed.domains = [parsed.domain];
-          delete parsed.domain;
+      
+      // Only load draft if explicitly requested (e.g., from history resume)
+      // Check if we're coming from a draft resume
+      const urlParams = new URLSearchParams(window.location.search);
+      const loadDraft = urlParams.get('resume') === 'true';
+      
+      if (loadDraft) {
+        const latest = await (await import("@/lib/storage")).loadLatestDraft(username);
+        if (latest?.state) {
+          const parsed = latest.state;
+          if (parsed.domain && !parsed.domains) {
+            parsed.domains = [parsed.domain];
+            delete parsed.domain;
+          }
+          if (!parsed.domains) parsed.domains = [];
+          setState(parsed);
+          // Update textarea values when draft is loaded
+          setTextareaValues({
+            goals: (parsed.goals || []).join("\n"),
+            users: (parsed.users || []).join("\n"),
+            geography: (parsed.geography || []).join("\n"),
+            compliance: (parsed.compliance || []).join("\n"),
+          });
+          toast.success("Draft restored");
         }
-        if (!parsed.domains) parsed.domains = [];
-        setState(parsed);
-        // Update textarea values when draft is loaded
-        setTextareaValues({
-          goals: (parsed.goals || []).join("\n"),
-          users: (parsed.users || []).join("\n"),
-          geography: (parsed.geography || []).join("\n"),
-          compliance: (parsed.compliance || []).join("\n"),
-        });
-        toast.success("Draft restored");
+      } else {
+        // Always start with clean form, clear any existing draft
+        localStorage.removeItem("xrl:intake:draft");
       }
     })();
   }, []);
