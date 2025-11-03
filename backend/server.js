@@ -109,9 +109,44 @@ app.post("/api/xrl-data-to-platform", async (req, res) => {
 // In-memory storage for results (replace with database in production)
 const resultsCache = new Map()
 
+// in-memory cache ל-MVP - התוצאה האחרונה בנורמליזציה חדשה
+let latestNormalized = null
+
+// עוזר לנרמול: הופך {domains:{'1':[...],...}} ל־
+// { matrix, domainKeys, paramCount } כש־matrix הוא מערך דו־ממדית [domainIndex][paramIndex] = value|null
+function normalizeDomainsPayload(body) {
+  const domains = body?.domains || {}
+  const domainKeys = ["1", "2", "3", "4", "5"]
+  
+  // כמה פרמטרים יש בסך הכל
+  const paramCount = Object.values(domains)
+    .reduce((max, arr) => {
+      if (!Array.isArray(arr)) return max
+      const maxParam = arr.reduce((m, item) => {
+        const p = Number(item?.parameter) || 0
+        return Math.max(m, p)
+      }, 0)
+      return Math.max(max, maxParam)
+    }, 0)
+
+  const matrix = domainKeys.map(() => Array.from({ length: paramCount }, () => null))
+
+  domainKeys.forEach((k, di) => {
+    const arr = Array.isArray(domains[k]) ? domains[k] : []
+    for (const item of arr) {
+      const p = Number(item?.parameter)
+      const v = item?.value
+      if (!Number.isInteger(p) || p <= 0) continue
+      matrix[di][p - 1] = typeof v === "number" ? v : Number(v)
+    }
+  })
+
+  return { matrix, domainKeys, paramCount }
+}
+
 // Helper for debugging
 app.get("/api/debug/routes", (_, res) => {
-  res.json({ routes: ["/api/health", "/api/n8n/callback", "/api/debug/routes"] })
+  res.json({ routes: ["/api/health", "/api/n8n/callback", "/api/results/latest", "/api/debug/routes"] })
 })
 
 // POST /api/n8n/callback - callback endpoint from n8n
@@ -130,74 +165,39 @@ app.post("/api/n8n/callback", cors(), async (req, res) => {
 
   console.log("callback payload:", JSON.stringify(req.body, null, 2))
 
-  // Try to extract runId and results from different possible formats
-  let runId = req.body.runId
-  let results = req.body.results
-  
-  // If data comes in n8n format with domains object
-  if (!runId && req.body.domains) {
-    console.log("Detected n8n format with domains object")
-    // Extract runId from meta or generate one
-    runId = req.body.meta?.runId || req.body.meta?.flow || `n8n-${Date.now()}`
-    
-    // Convert domains object to results format
-    // Expected format: { [domain]: { [paramIndex]: number } }
-    results = {}
-    
-    if (req.body.domains && typeof req.body.domains === "object") {
-      Object.keys(req.body.domains).forEach((domainKey) => {
-        const domainValue = req.body.domains[domainKey]
-        if (domainValue && domainValue !== "") {
-          // Get domain name from key or value
-          const domainName = domainKey.startsWith("Domain ") 
-            ? domainValue  // If key is "Domain 1", use value as domain name
-            : domainKey
-          
-          // If we have actual domain data, structure it properly
-          // For now, store the value as parameter 0
-          if (domainName && domainName !== "") {
-            results[domainName] = {
-              0: typeof domainValue === "string" ? parseFloat(domainValue) || 0 : domainValue
-            }
-          }
-        }
-      })
-    }
-    
-    console.log("Converted format - runId:", runId, "results:", JSON.stringify(results, null, 2))
-  }
-  
-  // If we still have proper runId and results format
-  if (runId && results && typeof results === "object") {
-    // Ensure results structure is correct: { [domain]: { [paramIndex]: number } }
-    const normalizedResults = {}
-    Object.keys(results).forEach((domain) => {
-      const domainData = results[domain]
-      if (domainData && typeof domainData === "object") {
-        normalizedResults[domain] = {}
-        Object.keys(domainData).forEach((key) => {
-          const paramIndex = parseInt(key)
-          const value = domainData[key]
-          if (!isNaN(paramIndex)) {
-            normalizedResults[domain][paramIndex] = typeof value === "string" 
-              ? parseFloat(value) || 0 
-              : (typeof value === "number" ? value : 0)
-          }
-        })
-      }
+  // ולידציה בסיסית לפורמט החדש
+  if (!req.body || !req.body.domains) {
+    return res.status(400).json({ 
+      error: "invalid_payload", 
+      hint: "expected { domains: { '1': [ {parameter,value} ], ... } }" 
     })
-
-    resultsCache.set(runId, {
-      runId,
-      results: normalizedResults,
-      receivedAt: new Date().toISOString()
-    })
-    console.log(`Results saved for runId: ${runId}`, JSON.stringify(normalizedResults, null, 2))
-  } else {
-    console.log("Warning: Missing runId or results. Full body:", JSON.stringify(req.body, null, 2))
   }
 
-  return res.json({ ok: true, runId: runId || null, resultsReceived: !!results })
+  // נרמול לפורמט החדש
+  const normalized = normalizeDomainsPayload(req.body)
+  latestNormalized = {
+    receivedAt: new Date().toISOString(),
+    meta: req.body.meta || {},
+    ...normalized
+  }
+
+  console.log("Normalized data saved:", JSON.stringify(latestNormalized, null, 2))
+
+  // שמירה גם ב-cache הישן למען תאימות לאחור
+  let runId = req.body.meta?.runId || `n8n-${Date.now()}`
+  resultsCache.set(runId, {
+    runId,
+    results: normalized,
+    receivedAt: latestNormalized.receivedAt
+  })
+
+  return res.json({ ok: true, received: true, paramCount: normalized.paramCount })
+})
+
+// שליפה לפרונט - התוצאה האחרונה
+app.get("/api/results/latest", (_, res) => {
+  if (!latestNormalized) return res.status(404).json({ error: "no_data" })
+  res.json(latestNormalized)
 })
 
 // GET /api/results/:runId - get results for a specific run

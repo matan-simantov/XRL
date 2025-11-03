@@ -1678,8 +1678,8 @@ Best regards`);
                                       {param.short}
                                     </span>
                                   </TooltipTrigger>
-                                  <TooltipContent side="right" className="max-w-md">
-                                    <p className="break-words">{param.full}</p>
+                                  <TooltipContent side="right" className="max-w-lg whitespace-normal">
+                                    <p className="break-words text-sm leading-relaxed">{param.full}</p>
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
@@ -1856,6 +1856,9 @@ Best regards`);
               );
             }
             
+            // Active parameters: 0, 1, 2, 3, 4, 5, 6, 8, 10
+            const activeParams = [0, 1, 2, 3, 4, 5, 6, 8, 10]
+            
             return (
               <div key="results-table" className="overflow-x-auto">
                 <table className="border-collapse mx-auto" style={{ width: '100%', maxWidth: '100%', tableLayout: 'auto' }}>
@@ -1875,6 +1878,7 @@ Best regards`);
                   {Object.keys(CATEGORIES).map((categoryName) => {
                     const category = categoryName as CategoryName;
                     const categoryParams = getParameterIndicesByCategory(category);
+                    const activeCategoryParams = categoryParams.filter(p => activeParams.includes(p))
                     
                     return (
                       <Fragment key={category}>
@@ -1899,13 +1903,13 @@ Best regards`);
                               </Button>
                               <span className="text-base font-bold text-foreground">{category}</span>
                               <span className="text-xs text-muted-foreground font-normal">
-                                ({categoryParams.length})
+                                ({activeCategoryParams.length})
                               </span>
                             </div>
                           </td>
                           {domains.map((domain, domainIdx) => {
-                            // Check if category has any data
-                            const hasData = categoryParams.some((paramIndex) => 
+                            // Check if category has any data (only for active parameters)
+                            const hasData = activeCategoryParams.some((paramIndex) => 
                               resultData[domain]?.[paramIndex] !== null && 
                               resultData[domain]?.[paramIndex] !== undefined
                             );
@@ -1923,7 +1927,7 @@ Best regards`);
                         </tr>
                         {/* Parameters in this category - only show if expanded */}
                         {/* Only show parameters that should have results: 0, 1, 2, 3, 4, 5, 6, 8, 10 */}
-                        {expandedCategories.has(category) && categoryParams.filter(paramIndex => [0, 1, 2, 3, 4, 5, 6, 8, 10].includes(paramIndex)).map((paramIndex) => {
+                        {expandedCategories.has(category) && activeCategoryParams.map((paramIndex) => {
                           const param = parameters[paramIndex];
                           return (
                             <tr key={paramIndex} className="border-b border-border hover:bg-accent/50 transition-colors">
@@ -1935,8 +1939,8 @@ Best regards`);
                                         {param.short}
                                       </span>
                                     </TooltipTrigger>
-                                    <TooltipContent side="right" className="max-w-md">
-                                      <p className="break-words">{param.full}</p>
+                                    <TooltipContent side="right" className="max-w-lg whitespace-normal">
+                                      <p className="break-words text-sm leading-relaxed">{param.full}</p>
                                     </TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>

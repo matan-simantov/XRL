@@ -81,6 +81,12 @@ export async function fetchResultsFromN8n(runId: string) {
   return data
 }
 
+export async function fetchLatestResults() {
+  const r = await fetch(`${API}/api/results/latest`, { credentials: "include" })
+  if (!r.ok) throw new Error("failed_to_fetch_results")
+  return r.json()
+}
+
 function getSession(): any {
   try {
     if (typeof window === "undefined") return null
