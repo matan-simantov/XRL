@@ -56,3 +56,5 @@ Server is running on port 10000
 
 **הערה:** Blueprints ב-Render לא תומכים טוב ב-rootDir ב-render.yaml, לכן עדכון ידני הוא הפתרון הכי בטוח!
 
+git add .
+git commit

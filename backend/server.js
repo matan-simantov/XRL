@@ -153,20 +153,106 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
 
   const body = req.body
 
-  // וולידציה של הפורמט מ-n8n
-  if (!body || !Array.isArray(body.matrix) || !Array.isArray(body.domain_keys)) {
+  // לוג של מה מתקבל בפועל לדייבוג
+  console.log("=== n8n callback received ===")
+  console.log("Headers:", JSON.stringify(req.headers, null, 2))
+  console.log("Body type:", typeof body)
+  console.log("Body keys:", body ? Object.keys(body) : "null/undefined")
+  console.log("Body sample:", JSON.stringify(body, null, 2).substring(0, 500))
+
+  // בדיקה אם body ריק או לא תקין
+  if (!body || Object.keys(body).length === 0) {
     return res.status(400).json({ 
       error: "invalid_payload", 
-      hint: "expected { matrix: [[...]], domain_keys: [...], param_count: number, meta: {...} }" 
+      hint: "request body is empty or missing",
+      received: "empty"
     })
   }
 
-  const matrix = body.matrix
-  const domainKeys = body.domain_keys
-  const paramCount = body.param_count || matrix.length
-  const meta = body.meta || {}
+  // ניסיון לזהות את הפורמט
+  let matrix = null
+  let domainKeys = null
+  let paramCount = null
+  let meta = body.meta || {}
 
-  console.log("received matrix:", {
+  // פורמט 1: { matrix: [[...]], domain_keys: [...], param_count: number }
+  if (Array.isArray(body.matrix) && Array.isArray(body.domain_keys)) {
+    matrix = body.matrix
+    domainKeys = body.domain_keys
+    paramCount = body.param_count || matrix.length
+    console.log("Detected format: direct matrix array")
+  }
+  // פורמט 2: { matrix: { domain_keys: {...}, param_count: number, values: {...} } }
+  else if (body.matrix && typeof body.matrix === "object" && body.matrix.domain_keys && body.matrix.values) {
+    const matrixObj = body.matrix
+    domainKeys = Object.values(matrixObj.domain_keys).map(Number).sort((a, b) => a - b)
+    paramCount = matrixObj.param_count || 9
+    
+    // המרה מ-values object למטריצה
+    // values הוא אובייקט שבו המפתח הוא paramIndex והערך הוא אובייקט של domainIndex: value
+    const values = matrixObj.values || {}
+    matrix = Array.from({ length: paramCount }, () => 
+      Array.from({ length: domainKeys.length }, () => null)
+    )
+    
+    Object.keys(values).forEach((paramKey) => {
+      const paramIndex = parseInt(paramKey)
+      if (isNaN(paramIndex)) return
+      const domainValues = values[paramKey] || {}
+      Object.keys(domainValues).forEach((domainKey) => {
+        const domainIndex = parseInt(domainKey)
+        if (isNaN(domainIndex)) return
+        const domainPos = domainKeys.indexOf(domainIndex)
+        if (domainPos >= 0 && paramIndex >= 0 && paramIndex < paramCount) {
+          matrix[paramIndex][domainPos] = domainValues[domainKey]
+        }
+      })
+    })
+    
+    console.log("Detected format: matrix object with values")
+  }
+  // פורמט 3: entries array (הישן)
+  else if (Array.isArray(body.entries) || Array.isArray(body)) {
+    const entries = Array.isArray(body) ? body : body.entries
+    console.log("Detected format: entries array, converting to matrix")
+    
+    // המרה מ-entries למטריצה
+    let maxParam = 0
+    let maxDomain = 0
+    
+    entries.forEach((entry) => {
+      const param = Number(entry?.parameter) || 0
+      const domain = Number(entry?.index) || 0
+      if (param > maxParam) maxParam = param
+      if (domain > maxDomain) maxDomain = domain
+    })
+    
+    paramCount = maxParam
+    domainKeys = Array.from({ length: maxDomain }, (_, i) => i + 1)
+    matrix = Array.from({ length: paramCount }, () => 
+      Array.from({ length: domainKeys.length }, () => null)
+    )
+    
+    entries.forEach((entry) => {
+      const paramIndex = Number(entry?.parameter) - 1
+      const domainIndex = Number(entry?.index) - 1
+      const value = entry?.value
+      
+      if (paramIndex >= 0 && domainIndex >= 0 && 
+          paramIndex < paramCount && domainIndex < domainKeys.length) {
+        matrix[paramIndex][domainIndex] = typeof value === "number" ? value : Number(value)
+      }
+    })
+  }
+  else {
+    return res.status(400).json({ 
+      error: "invalid_payload", 
+      hint: "expected one of: { matrix: [[...]], domain_keys: [...] } OR { matrix: { domain_keys: {...}, values: {...} } } OR { entries: [...] }",
+      received_keys: body ? Object.keys(body) : []
+    })
+  }
+
+  console.log("Normalized matrix:", {
     rows: matrix.length,
     cols: matrix[0]?.length || 0,
     paramCount,
@@ -182,14 +268,10 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
     meta
   }
 
-  console.log("Data saved:", {
-    paramCount,
-    domainCount: domainKeys.length,
-    sample: matrix[0]?.slice(0, 3)
-  })
+  console.log("Data saved successfully")
 
   // שמירה גם ב-cache הישן למען תאימות לאחור
-  let runId = meta?.runId || `n8n-${Date.now()}`
+  let runId = meta?.runId || body.run_id || `n8n-${Date.now()}`
   resultsCache.set(runId, {
     runId,
     results: latestNormalized,
