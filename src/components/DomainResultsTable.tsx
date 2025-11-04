@@ -8,8 +8,14 @@ export default function DomainResultsTable() {
 
   useEffect(() => {
     fetchLatestResults()
-      .then(setData)
-      .catch((e) => setErr(e?.message || "error"))
+      .then((result) => {
+        console.log("Fetched latest results:", result)
+        setData(result)
+      })
+      .catch((e) => {
+        console.error("Error fetching results:", e)
+        setErr(e?.message || "error")
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -17,7 +23,27 @@ export default function DomainResultsTable() {
   if (err) return <div className="p-4 text-red-600">Error: {err}</div>
   if (!data) return <div className="p-4">No data</div>
 
+  console.log("Rendering table with data:", {
+    hasMatrix: !!data.matrix,
+    matrixLength: data.matrix?.length,
+    hasDomainKeys: !!data.domainKeys,
+    domainKeysLength: data.domainKeys?.length,
+    paramCount: data.paramCount
+  })
+
   const { matrix, domainKeys, paramCount } = data
+
+  if (!matrix || !Array.isArray(matrix)) {
+    return <div className="p-4 text-red-600">Invalid data: matrix is missing or not an array</div>
+  }
+
+  if (!domainKeys || !Array.isArray(domainKeys)) {
+    return <div className="p-4 text-red-600">Invalid data: domainKeys is missing or not an array</div>
+  }
+
+  if (!paramCount || paramCount <= 0) {
+    return <div className="p-4 text-red-600">Invalid data: paramCount is missing or invalid</div>
+  }
 
   // matrix[paramIndex][domainIndex] = value
   // matrix[0][0] = parameter 1, domain 1

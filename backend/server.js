@@ -183,33 +183,69 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
     console.log("Detected format: direct matrix array")
   }
   // פורמט 2: { matrix: { domain_keys: {...}, param_count: number, values: {...} } }
-  else if (body.matrix && typeof body.matrix === "object" && body.matrix.domain_keys && body.matrix.values) {
+  else if (body.matrix && typeof body.matrix === "object" && body.matrix.domain_keys) {
     const matrixObj = body.matrix
-    domainKeys = Object.values(matrixObj.domain_keys).map(Number).sort((a, b) => a - b)
+    
+    // domain_keys יכול להיות object {0:1, 1:2, ...} או array
+    if (typeof matrixObj.domain_keys === "object" && !Array.isArray(matrixObj.domain_keys)) {
+      domainKeys = Object.values(matrixObj.domain_keys).map(Number).sort((a, b) => a - b)
+    } else if (Array.isArray(matrixObj.domain_keys)) {
+      domainKeys = matrixObj.domain_keys.map(Number)
+    } else {
+      domainKeys = [1, 2, 3, 4, 5]
+    }
+    
     paramCount = matrixObj.param_count || 9
     
-    // המרה מ-values object למטריצה
-    // values הוא אובייקט שבו המפתח הוא paramIndex והערך הוא אובייקט של domainIndex: value
+    // values יכול להיות array של arrays או object
     const values = matrixObj.values || {}
-    matrix = Array.from({ length: paramCount }, () => 
-      Array.from({ length: domainKeys.length }, () => null)
-    )
     
-    Object.keys(values).forEach((paramKey) => {
-      const paramIndex = parseInt(paramKey)
-      if (isNaN(paramIndex)) return
-      const domainValues = values[paramKey] || {}
-      Object.keys(domainValues).forEach((domainKey) => {
-        const domainIndex = parseInt(domainKey)
-        if (isNaN(domainIndex)) return
-        const domainPos = domainKeys.indexOf(domainIndex)
-        if (domainPos >= 0 && paramIndex >= 0 && paramIndex < paramCount) {
-          matrix[paramIndex][domainPos] = domainValues[domainKey]
+    if (Array.isArray(values)) {
+      // אם values הוא array, זה כבר מטריצה!
+      matrix = values
+      console.log("Detected format: matrix object with values array")
+    } else if (typeof values === "object") {
+      // המרה מ-values object למטריצה
+      // values הוא אובייקט שבו המפתח הוא paramIndex והערך הוא array או object של domainIndex: value
+      matrix = Array.from({ length: paramCount }, () => 
+        Array.from({ length: domainKeys.length }, () => null)
+      )
+      
+      Object.keys(values).forEach((paramKey) => {
+        const paramIndex = parseInt(paramKey)
+        if (isNaN(paramIndex) || paramIndex < 0) return
+        
+        const domainValues = values[paramKey]
+        
+        // אם זה array
+        if (Array.isArray(domainValues)) {
+          domainValues.forEach((value, idx) => {
+            if (idx < domainKeys.length && paramIndex < paramCount) {
+              matrix[paramIndex][idx] = value
+            }
+          })
+        }
+        // אם זה object
+        else if (typeof domainValues === "object") {
+          Object.keys(domainValues).forEach((domainKey) => {
+            const domainIndex = parseInt(domainKey)
+            if (isNaN(domainIndex)) return
+            const domainPos = domainKeys.indexOf(domainIndex)
+            if (domainPos >= 0 && paramIndex >= 0 && paramIndex < paramCount) {
+              matrix[paramIndex][domainPos] = domainValues[domainKey]
+            }
+          })
         }
       })
-    })
+      
+      console.log("Detected format: matrix object with values object")
+    }
     
-    console.log("Detected format: matrix object with values")
+    console.log("Converted matrix:", {
+      rows: matrix.length,
+      cols: matrix[0]?.length || 0,
+      sample: matrix[0]?.slice(0, 3)
+    })
   }
   // פורמט 3: entries array (הישן)
   else if (Array.isArray(body.entries) || Array.isArray(body)) {
@@ -283,7 +319,20 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
 
 // שליפה לפרונט - התוצאה האחרונה
 app.get("/api/results/latest", (_, res) => {
-  if (!latestNormalized) return res.status(404).json({ error: "no_data" })
+  console.log("GET /api/results/latest called")
+  if (!latestNormalized) {
+    console.log("No data available in latestNormalized")
+    return res.status(404).json({ error: "no_data" })
+  }
+  
+  console.log("Returning latestNormalized:", {
+    hasMatrix: !!latestNormalized.matrix,
+    matrixLength: latestNormalized.matrix?.length,
+    hasDomainKeys: !!latestNormalized.domainKeys,
+    domainKeysLength: latestNormalized.domainKeys?.length,
+    paramCount: latestNormalized.paramCount
+  })
+  
   res.json(latestNormalized)
 })
 
