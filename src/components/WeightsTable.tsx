@@ -1803,8 +1803,8 @@ Best regards`);
               );
             }
             
-            // Active parameters: 0, 1, 2, 3, 4, 5, 6, 8, 10
-            const activeParams = [0, 1, 2, 3, 4, 5, 6, 8, 10]
+            // Active parameters: 0, 1, 2, 3, 4, 5, 6, 7, 8
+            const activeParams = [0, 1, 2, 3, 4, 5, 6, 7, 8]
             
             return (
               <div key="results-table" className="overflow-x-auto">
@@ -1902,14 +1902,15 @@ Best regards`);
                                       const num = Number(value);
                                       
                                       // Format based on parameter type
-                                      if (paramIndex === 8) {
-                                        // Ratio - value is a decimal (0.3245 = 32.45%)
-                                        // Always treat as decimal ratio and convert to percentage
+                                      if (paramIndex === 7) {
+                                        // Series A/Seed Ratio - value is a decimal ratio (0.38 = 38%)
+                                        // Convert to percentage
                                         return `${(num * 100).toFixed(2)}%`;
                                       }
-                                      if (paramIndex === 10) {
-                                        // Average age in years
-                                        return `${num.toFixed(2)} yrs`;
+                                      if (paramIndex === 8) {
+                                        // Average Company Age - value is already in years
+                                        // Just show as number with 2 decimal places, no multiplication
+                                        return num.toFixed(2);
                                       }
                                       // For other numbers, show up to 2 decimal places if needed
                                       if (Number.isInteger(num)) {
