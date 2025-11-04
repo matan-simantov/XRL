@@ -66,8 +66,19 @@ const NewForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [sheetUrl, setSheetUrl] = useState<string | null>(null);
+  const [shouldPollResults, setShouldPollResults] = useState(false);
   const navigate = useNavigate();
   const { getButtonClasses, getTextClass, getBgLightClass } = useButtonColor();
+
+  // Polling for results from n8n
+  useResultsPolling({
+    enabled: shouldPollResults,
+    interval: 5000, // Check every 5 seconds
+    onOpenResults: () => {
+      // Open results table when results are ready
+      navigate("/results");
+    }
+  });
 
   // Temporary state for textarea fields to allow Enter key
   const [textareaValues, setTextareaValues] = useState({
@@ -319,28 +330,10 @@ const NewForm = () => {
     // Clear the draft (but keep form state for viewing weights table)
     localStorage.removeItem("xrl:intake:draft");
     
-    // Show success with action button
-    toast.success("Submission completed successfully!", { 
-      duration: 10000,
-      action: {
-        label: "View Results",
-        onClick: () => {
-          // Try to open weights table if on NewForm page
-          setShowWeightsTable(true);
-          setTimeout(() => {
-            const tableElement = document.querySelector('[data-weights-table]');
-            if (tableElement) {
-              tableElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            } else {
-              // If not on NewForm page, navigate to history and open the weights table
-              localStorage.setItem("xrl:openWeightsTableForRun", savedRun.id);
-              navigate("/dashboard/history");
-            }
-          }, 100);
-        }
-      }
-    });
-
+    // Don't show success toast - will show when results are ready via polling
+    // Start polling for results
+    setShouldPollResults(true);
+    
     setIsSubmitting(false);
   };
 

@@ -1,22 +1,46 @@
 import { useEffect, useState } from "react"
 import { fetchLatestResults } from "../lib/api"
+import { Button } from "@/components/ui/button"
+import { RefreshCw } from "lucide-react"
 
 export default function DomainResultsTable() {
   const [data, setData] = useState<any>(null)
   const [err, setErr] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const loadResults = async () => {
+    try {
+      setIsRefreshing(true)
+      const result = await fetchLatestResults()
+      console.log("Fetched latest results:", result)
+      setData(result)
+      setErr(null)
+    } catch (e: any) {
+      console.error("Error fetching results:", e)
+      // Don't show error if it's just "no data" - that's expected
+      if (e?.message && !e.message.includes("404") && !e.message.includes("no_data")) {
+        setErr(e?.message || "error")
+      } else {
+        setErr(null)
+      }
+    } finally {
+      setLoading(false)
+      setIsRefreshing(false)
+    }
+  }
 
   useEffect(() => {
-    fetchLatestResults()
-      .then((result) => {
-        console.log("Fetched latest results:", result)
-        setData(result)
-      })
-      .catch((e) => {
-        console.error("Error fetching results:", e)
-        setErr(e?.message || "error")
-      })
-      .finally(() => setLoading(false))
+    loadResults()
+
+    // Auto-refresh every 10 seconds
+    const interval = setInterval(() => {
+      if (!loading && !isRefreshing) {
+        loadResults()
+      }
+    }, 10000)
+
+    return () => clearInterval(interval)
   }, [])
 
   if (loading) return <div className="p-4">Loading…</div>
@@ -51,8 +75,21 @@ export default function DomainResultsTable() {
   // matrix[1][0] = parameter 2, domain 1
 
   return (
-    <div className="p-4 overflow-auto">
-      <table className="min-w-full border border-gray-200">
+    <div className="p-4">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold">Domain Results</h2>
+        <Button
+          onClick={loadResults}
+          disabled={isRefreshing}
+          variant="outline"
+          size="sm"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
+      </div>
+      <div className="overflow-auto">
+        <table className="min-w-full border border-gray-200">
         <thead>
           <tr>
             <th className="px-3 py-2 border-b text-left">Parameter</th>
@@ -77,6 +114,7 @@ export default function DomainResultsTable() {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }
