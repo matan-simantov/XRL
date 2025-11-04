@@ -16,6 +16,7 @@ import { WeightsTable } from "@/components/WeightsTable";
 import { getSession, saveDraft, commitRun } from "@/lib/storage";
 import { useButtonColor } from "@/hooks/use-button-color";
 import { sendToCrunchbase, sendToXRLDataToPlatformDirect } from "@/lib/api";
+import { useResultsPolling } from "@/hooks/use-results-polling";
 
 type XrlState = {
   sector: string;
