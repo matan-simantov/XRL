@@ -1124,15 +1124,24 @@ Best regards`);
         // matrix[paramIndex][domainIndex] = value
         const convertedData: Record<string, Record<number, number>> = {};
         
+        console.log("Raw matrix data:", data.matrix);
+        console.log("Matrix length (params):", data.matrix.length);
+        console.log("First row length (domains):", data.matrix[0]?.length);
+        
         domains.forEach((domain, domainIndex) => {
           convertedData[domain] = {};
           data.matrix.forEach((row, paramIndex) => {
             const value = row[domainIndex];
-            if (value !== null && value !== undefined) {
+            if (value !== null && value !== undefined && !Number.isNaN(value)) {
               convertedData[domain][paramIndex] = value;
             }
           });
         });
+        
+        console.log("Converted resultData - all domains:", Object.keys(convertedData));
+        console.log("Parameters in first domain:", Object.keys(convertedData[domains[0]] || {}));
+        console.log("Value for param 8 in first domain:", convertedData[domains[0]]?.[8]);
+        console.log("Value for param 10 in first domain:", convertedData[domains[0]]?.[10]);
         
         setResultData(convertedData);
         setShowResultsTable(true);
@@ -1173,15 +1182,23 @@ Best regards`);
         // matrix[paramIndex][domainIndex] = value
         const convertedData: Record<string, Record<number, number>> = {};
         
+        console.log("Raw matrix data in handleShowResults:", data.matrix);
+        console.log("Matrix length (params):", data.matrix.length);
+        
         domains.forEach((domain, domainIndex) => {
           convertedData[domain] = {};
           data.matrix.forEach((row, paramIndex) => {
             const value = row[domainIndex];
-            if (value !== null && value !== undefined) {
+            if (value !== null && value !== undefined && !Number.isNaN(value)) {
               convertedData[domain][paramIndex] = value;
             }
           });
         });
+        
+        console.log("Converted resultData - all domains:", Object.keys(convertedData));
+        console.log("Parameters in first domain:", Object.keys(convertedData[domains[0]] || {}));
+        console.log("Value for param 8 in first domain:", convertedData[domains[0]]?.[8]);
+        console.log("Value for param 10 in first domain:", convertedData[domains[0]]?.[10]);
         
         setResultData(convertedData);
         setShowResultsTable(true);
@@ -1882,11 +1899,19 @@ Best regards`);
                                     {(() => {
                                       if (value === undefined || value === null) return "-";
                                       
-                                      // Format based on parameter type
-                                      if (paramIndex === 8) return `${(value * 100).toFixed(2)}%`; // Ratio percentage
-                                      if (paramIndex === 10) return `${value.toFixed(2)} yrs`; // Average age in years
-                                      // For other numbers, show up to 2 decimal places if needed
                                       const num = Number(value);
+                                      
+                                      // Format based on parameter type
+                                      if (paramIndex === 8) {
+                                        // Ratio - value is a decimal (0.3245 = 32.45%)
+                                        // Always treat as decimal ratio and convert to percentage
+                                        return `${(num * 100).toFixed(2)}%`;
+                                      }
+                                      if (paramIndex === 10) {
+                                        // Average age in years
+                                        return `${num.toFixed(2)} yrs`;
+                                      }
+                                      // For other numbers, show up to 2 decimal places if needed
                                       if (Number.isInteger(num)) {
                                         return num.toString(); // Whole numbers
                                       }

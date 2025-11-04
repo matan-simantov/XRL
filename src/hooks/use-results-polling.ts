@@ -20,6 +20,7 @@ export function useResultsPolling({
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const lastDataRef = useRef<any>(null)
   const toastShownRef = useRef(false)
+  const foundResultsRef = useRef(false) // Track if we found results to prevent re-polling
 
   useEffect(() => {
     if (!enabled) {
@@ -28,14 +29,28 @@ export function useResultsPolling({
         intervalRef.current = null
       }
       setIsPolling(false)
+      foundResultsRef.current = false
+      return
+    }
+
+    // If we already found results, don't poll again
+    if (foundResultsRef.current) {
       return
     }
 
     setIsPolling(true)
     toastShownRef.current = false
-    let hasShownToast = false
 
     const checkResults = async () => {
+      // If we already found results, stop checking
+      if (foundResultsRef.current) {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current)
+          intervalRef.current = null
+        }
+        return
+      }
+
       try {
         const data = await fetchLatestResults()
         
@@ -45,55 +60,39 @@ export function useResultsPolling({
             Array.isArray(row) && row.some(val => val !== null && val !== undefined)
           )
 
-          if (hasData && !hasShownToast) {
+          if (hasData) {
+            // Mark that we found results - stop all future polling
+            foundResultsRef.current = true
             setHasResults(true)
             setIsPolling(false)
             
+            // Stop polling immediately after finding results
             if (intervalRef.current) {
               clearInterval(intervalRef.current)
               intervalRef.current = null
             }
 
-            // Show toast only once
-            if (!toastShownRef.current && onOpenResults) {
-              toastShownRef.current = true
-              hasShownToast = true
-              toast.success("Results are ready!", {
-                description: "The data from n8n has been processed and is now available.",
-                duration: 10000,
-                action: {
-                  label: "View Results",
-                  onClick: () => {
-                    onOpenResults()
-                  }
-                }
-              })
-            }
+            // Don't show toast - user will access results table manually via "Results" button
 
             if (onResultsReceived) {
               onResultsReceived(data)
             }
 
             lastDataRef.current = data
+            return // Exit early - found results, stop polling
           }
         }
       } catch (error: any) {
-        // Silently handle 404 - no results yet
-        if (error?.message?.includes("404") || error?.message?.includes("no_data") || error?.message?.includes("Failed to fetch")) {
-          // Results not ready yet, continue polling silently
-          return
-        }
-        // Only log non-network errors
-        if (!error?.message?.includes("Failed to fetch")) {
-          console.error("Error polling for results:", error)
-        }
+        // Silently handle all errors - don't log or show anything
+        // Continue polling silently
+        return
       }
     }
 
     // Check immediately
     checkResults()
 
-    // Then check periodically
+    // Start interval for polling
     intervalRef.current = setInterval(checkResults, interval)
 
     return () => {
