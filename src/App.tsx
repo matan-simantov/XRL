@@ -57,7 +57,7 @@ const App = () => {
               <Route path="history" element={<ProtectedRoute><History /></ProtectedRoute>} />
               <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             </Route>
-            <Route path="/results" element={<ProtectedRoute><div className="p-6"><h1 className="text-2xl mb-4">XRL Results</h1><DomainResultsTable /></div></ProtectedRoute>} />
+            <Route path="/results" element={<ProtectedRoute><div className="p-6"><h1 className="text-2xl mb-4">XRL Results</h1><DomainResultsTable domains={[]} /></div></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

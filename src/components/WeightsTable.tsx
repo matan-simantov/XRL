@@ -39,7 +39,7 @@ import { useButtonColor } from "@/hooks/use-button-color";
 import { getColorClasses } from "@/hooks/use-theme-color";
 import { toast } from "sonner";
 import { updateRunTableState, getSession } from "@/lib/storage";
-import { fetchResultsFromN8n } from "@/lib/api";
+import { fetchResultsFromN8n, fetchLatestResults } from "@/lib/api";
 
 interface WeightsTableProps {
   llms: string[];
@@ -368,7 +368,6 @@ export const WeightsTable = ({ llms = [], participants = [], domains = [], initi
   const [resultData, setResultData] = useState<Record<string, Record<number, number>>>({});
   // Always start with weights view when opening from History
   const [viewMode, setViewMode] = useState<'weights' | 'results'>('weights');
-  const [showDummyDataDialog, setShowDummyDataDialog] = useState(false);
   const [hasRealData, setHasRealData] = useState(false);
   
   // Track which categories are expanded (default: all closed)
@@ -1112,109 +1111,49 @@ Best regards`);
     return llmAvg * llmWeightPercent + humanAvg * humanWeightPercent;
   };
 
-  // Generate dummy results only for the parameters that should return results
-  // Parameters that should have results: 0, 1, 2, 3, 4, 5, 6, 8, 10
-  const generateDummyResults = (): Record<string, Record<number, number>> => {
-    const results: Record<string, Record<number, number>> = {};
-    
-    // Only these parameter indices should have results
-    const activeParameterIndices = [0, 1, 2, 3, 4, 5, 6, 8, 10];
-    
-    domains.forEach((domain) => {
-      results[domain] = {};
-      
-      // Domain seed for variation between sectors
-      const domainSeed = domain.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-      const domainMultiplier = 0.8 + (domainSeed % 40) / 100; // 0.8 to 1.2
-      
-      // Generate results only for active parameters
-      activeParameterIndices.forEach((paramIndex) => {
-        // Get the final weight for this domain and parameter
-        const finalWeight = calculateFinalWeightForDomain(domain, paramIndex);
-        const weightInfluence = finalWeight / 10; // 0-10 range
-        
-        let result: number;
-        
-        switch (paramIndex) {
-          case 0: // Number of IPOs in the sector worldwide in the past 5 years (2020–2025)
-            result = Math.round((10 + weightInfluence * 3 + Math.random() * 10) * domainMultiplier);
-            break;
-          case 1: // Number of companies worldwide that were acquired or merged in the past 5 years (2020–2025)
-            result = Math.round((150 + weightInfluence * 30 + Math.random() * 100) * domainMultiplier);
-            break;
-          case 2: // Number of active companies in the sector worldwide
-            result = Math.round((2500 + weightInfluence * 300 + Math.random() * 1000) * domainMultiplier);
-            break;
-          case 3: // Number of new companies in the past 5 years (2020–2025)
-            result = Math.round((600 + weightInfluence * 100 + Math.random() * 400) * domainMultiplier);
-            break;
-          case 4: // Number of companies in the sector worldwide that raised Pre-Seed & Seed rounds (2020–2025)
-            result = Math.round((800 + weightInfluence * 150 + Math.random() * 500) * domainMultiplier);
-            break;
-          case 5: // Number of companies in the sector worldwide that raised a Series A round (2020–2025)
-            result = Math.round((450 + weightInfluence * 80 + Math.random() * 300) * domainMultiplier);
-            break;
-          case 6: // Number of companies in the sector worldwide that raised Series B–C rounds (2020–2025)
-            result = Math.round((250 + weightInfluence * 50 + Math.random() * 180) * domainMultiplier);
-            break;
-          case 8: // Ratio of companies that raised a Series A round out of those that raised a Seed round in the past 5 years (2020–2025)
-            result = parseFloat((45 + weightInfluence * 3 + Math.random() * 15).toFixed(1));
-            break;
-          case 10: // Average age of an active company worldwide
-            result = parseFloat((6 + weightInfluence * 0.5 + Math.random() * 2.5).toFixed(1));
-            break;
-          default:
-            result = 0;
-        }
-        
-        results[domain][paramIndex] = result;
-      });
-    });
-    
-    return results;
-  };
+  // Removed dummy results generation - only real data from n8n
 
   const handleFinalConfirm = async () => {
     setShowConfirmDialog(false);
     
-    // Try to fetch results from n8n
-    const runId = formData?.id?.toString();
-    let n8nData: Record<string, Record<number, number>> | null = null;
-    
-    if (runId) {
-      try {
-        // Fetch data from n8n via backend proxy
-        const data = await fetchResultsFromN8n(runId);
-        // Check if data has results structure
-        if (data && data.results && typeof data.results === 'object') {
-          const results = data.results;
-          // Check if results object has any actual data
-          const hasData = Object.keys(results).some(domain => {
-            const domainData = results[domain];
-            return domainData && typeof domainData === 'object' && Object.keys(domainData).length > 0;
+    try {
+      const data = await fetchLatestResults();
+      
+      if (data && data.matrix && Array.isArray(data.matrix) && data.matrix.length > 0) {
+        // Convert matrix format to resultData format
+        // matrix[paramIndex][domainIndex] = value
+        const convertedData: Record<string, Record<number, number>> = {};
+        
+        domains.forEach((domain, domainIndex) => {
+          convertedData[domain] = {};
+          data.matrix.forEach((row, paramIndex) => {
+            const value = row[domainIndex];
+            if (value !== null && value !== undefined) {
+              convertedData[domain][paramIndex] = value;
+            }
           });
-          
-          if (hasData) {
-            n8nData = results;
-            setHasRealData(true);
-          }
-        }
-      } catch (error) {
-        console.error("Failed to fetch data from n8n:", error);
+        });
+        
+        setResultData(convertedData);
+        setShowResultsTable(true);
+        setViewMode('results');
+        setHasRealData(true);
+        toast.success("Results loaded from n8n", {
+          description: "Displaying actual results from n8n processing.",
+          duration: 3000,
+        });
+      } else {
+        // No data received - don't show results table
+        setResultData({});
+        setShowResultsTable(false);
+        setHasRealData(false);
+        toast.info("Results not ready yet", {
+          description: "Data from n8n is still being processed. Results will appear automatically when ready.",
+          duration: 5000,
+        });
       }
-    }
-    
-    // Only show results table if we have real data from n8n
-    if (n8nData && Object.keys(n8nData).length > 0) {
-      setResultData(n8nData);
-      setShowResultsTable(true);
-      setViewMode('results');
-      toast.success("Real data loaded from n8n", {
-        description: "Displaying actual results from n8n processing.",
-        duration: 3000,
-      });
-    } else {
-      // No data received - don't show results table
+    } catch (error) {
+      console.error("Failed to fetch data from n8n:", error);
       setResultData({});
       setShowResultsTable(false);
       setHasRealData(false);
@@ -1226,51 +1165,42 @@ Best regards`);
   };
 
   const handleShowResults = async () => {
-    const runId = formData?.id?.toString();
-    let n8nData: Record<string, Record<number, number>> | null = null;
-    
-    if (runId) {
-      try {
-        const data = await fetchResultsFromN8n(runId);
-        if (data && data.results && typeof data.results === 'object') {
-          const results = data.results;
-          const hasData = Object.keys(results).some(domain => {
-            const domainData = results[domain];
-            return domainData && typeof domainData === 'object' && Object.keys(domainData).length > 0;
+    try {
+      const data = await fetchLatestResults();
+      
+      if (data && data.matrix && Array.isArray(data.matrix) && data.matrix.length > 0) {
+        // Convert matrix format to resultData format
+        // matrix[paramIndex][domainIndex] = value
+        const convertedData: Record<string, Record<number, number>> = {};
+        
+        domains.forEach((domain, domainIndex) => {
+          convertedData[domain] = {};
+          data.matrix.forEach((row, paramIndex) => {
+            const value = row[domainIndex];
+            if (value !== null && value !== undefined) {
+              convertedData[domain][paramIndex] = value;
+            }
           });
-          
-          if (hasData) {
-            n8nData = results;
-            setHasRealData(true);
-          }
-        }
-      } catch (error) {
-        console.error("Failed to fetch data from n8n:", error);
+        });
+        
+        setResultData(convertedData);
+        setShowResultsTable(true);
+        setViewMode('results');
+        setHasRealData(true);
+        toast.success("Results loaded from n8n");
+      } else {
+        toast.info("Results not ready yet", {
+          description: "Data from n8n is still being processed. Please try again later.",
+          duration: 5000,
+        });
       }
+    } catch (error) {
+      console.error("Failed to fetch results:", error);
+      toast.error("Failed to load results", {
+        description: "Could not retrieve results from n8n. Please try again later.",
+        duration: 5000,
+      });
     }
-    
-    if (n8nData && Object.keys(n8nData).length > 0) {
-      setResultData(n8nData);
-      setShowResultsTable(true);
-      setViewMode('results');
-      toast.success("Real data loaded from n8n");
-    } else {
-      // No real data - ask if user wants dummy data
-      setShowDummyDataDialog(true);
-    }
-  };
-
-  const handleUseDummyData = () => {
-    setShowDummyDataDialog(false);
-    const dummyData = generateDummyResults();
-    setResultData(dummyData);
-    setShowResultsTable(true);
-    setViewMode('results');
-    setHasRealData(false);
-    toast.info("Displaying dummy data", {
-      description: "This is sample data. Real results will appear automatically when n8n processing is complete.",
-      duration: 5000,
-    });
   };
 
   // Ensure userWeights is initialized for currentDomain
@@ -1953,9 +1883,14 @@ Best regards`);
                                       if (value === undefined || value === null) return "-";
                                       
                                       // Format based on parameter type
-                                      if (paramIndex === 8) return `${value}%`; // Ratio percentage
-                                      if (paramIndex === 10) return `${value} yrs`; // Average age in years
-                                      return Math.round(value).toString(); // Whole numbers for counts
+                                      if (paramIndex === 8) return `${(value * 100).toFixed(2)}%`; // Ratio percentage
+                                      if (paramIndex === 10) return `${value.toFixed(2)} yrs`; // Average age in years
+                                      // For other numbers, show up to 2 decimal places if needed
+                                      const num = Number(value);
+                                      if (Number.isInteger(num)) {
+                                        return num.toString(); // Whole numbers
+                                      }
+                                      return num.toFixed(2); // Numbers with decimals - max 2 places
                                     })()}
                                   </td>
                                 );
@@ -2182,25 +2117,6 @@ Best regards`);
         </DialogContent>
       </Dialog>
 
-      {/* Dummy Data Confirmation Dialog */}
-      <AlertDialog open={showDummyDataDialog} onOpenChange={setShowDummyDataDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>No Real Data Available</AlertDialogTitle>
-            <AlertDialogDescription>
-              Results from n8n are not ready yet. Would you like to see sample (dummy) data instead?
-              <br /><br />
-              Note: Real results will appear automatically when n8n processing is complete.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>No, wait for real data</AlertDialogCancel>
-            <AlertDialogAction onClick={handleUseDummyData}>
-              Yes, show dummy data
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 };

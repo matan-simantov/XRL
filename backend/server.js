@@ -10,10 +10,18 @@ app.use(express.json())
 const raw = process.env.FRONTEND_ORIGIN || ""
 const allowlist = raw.split(",").map(s => s.trim()).filter(Boolean)
 
+// Allow common frontend origins
+const allowedOrigins = [
+  "https://xrl-front.onrender.com",
+  "http://localhost:5173",
+  "http://localhost:3000",
+  ...allowlist
+]
+
 const corsOptions = {
   origin: (origin, cb) => {
     if (!origin) return cb(null, true) // curl / healthchecks
-    if (allowlist.includes(origin)) return cb(null, true)
+    if (allowlist.includes(origin) || allowedOrigins.includes(origin)) return cb(null, true)
     console.log("CORS blocked origin:", origin)
     return cb(new Error("Not allowed by CORS"))
   },

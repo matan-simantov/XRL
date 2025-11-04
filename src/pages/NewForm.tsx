@@ -76,8 +76,14 @@ const NewForm = () => {
     enabled: shouldPollResults,
     interval: 5000, // Check every 5 seconds
     onOpenResults: () => {
-      // Open results table when results are ready
-      navigate("/results");
+      // Open results table in WeightsTable when results are ready
+      setShowWeightsTable(true);
+      setTimeout(() => {
+        const tableElement = document.querySelector('[data-weights-table]');
+        if (tableElement) {
+          tableElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
     }
   });
 

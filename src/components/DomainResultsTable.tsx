@@ -3,7 +3,29 @@ import { fetchLatestResults } from "../lib/api"
 import { Button } from "@/components/ui/button"
 import { RefreshCw } from "lucide-react"
 
-export default function DomainResultsTable() {
+interface DomainResultsTableProps {
+  domains?: string[]
+}
+
+// Parameters that should show results (indices 0-6, 8, 10)
+const RESULT_PARAMETER_INDICES = [0, 1, 2, 3, 4, 5, 6, 8, 10]
+
+// Parameter names matching the order in WeightsTable
+const PARAMETER_NAMES = [
+  "IPOs Worldwide",
+  "M&A Worldwide", 
+  "Active Companies Worldwide",
+  "New Companies Worldwide",
+  "Pre-Seed & Seed Worldwide",
+  "Series A Worldwide",
+  "Series B–C Worldwide",
+  "", // index 7 - not used
+  "Series A/Seed Ratio Worldwide",
+  "", // index 9 - not used
+  "Avg Company Age Worldwide"
+]
+
+export default function DomainResultsTable({ domains = [] }: DomainResultsTableProps) {
   const [data, setData] = useState<any>(null)
   const [err, setErr] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -47,14 +69,6 @@ export default function DomainResultsTable() {
   if (err) return <div className="p-4 text-red-600">Error: {err}</div>
   if (!data) return <div className="p-4">No data</div>
 
-  console.log("Rendering table with data:", {
-    hasMatrix: !!data.matrix,
-    matrixLength: data.matrix?.length,
-    hasDomainKeys: !!data.domainKeys,
-    domainKeysLength: data.domainKeys?.length,
-    paramCount: data.paramCount
-  })
-
   const { matrix, domainKeys, paramCount } = data
 
   if (!matrix || !Array.isArray(matrix)) {
@@ -65,14 +79,13 @@ export default function DomainResultsTable() {
     return <div className="p-4 text-red-600">Invalid data: domainKeys is missing or not an array</div>
   }
 
-  if (!paramCount || paramCount <= 0) {
-    return <div className="p-4 text-red-600">Invalid data: paramCount is missing or invalid</div>
-  }
+  // Use domain names from props if available, otherwise use Domain 1, 2, etc.
+  const domainNames = domains.length >= domainKeys.length 
+    ? domainKeys.map((_, idx) => domains[idx])
+    : domainKeys.map((dk) => `Domain ${dk}`)
 
-  // matrix[paramIndex][domainIndex] = value
-  // matrix[0][0] = parameter 1, domain 1
-  // matrix[0][1] = parameter 1, domain 2
-  // matrix[1][0] = parameter 2, domain 1
+  // Filter to only show parameters that should have results
+  const resultParameters = RESULT_PARAMETER_INDICES.filter(idx => idx < paramCount)
 
   return (
     <div className="p-4">
@@ -93,29 +106,31 @@ export default function DomainResultsTable() {
         <thead>
           <tr>
             <th className="px-3 py-2 border-b text-left">Parameter</th>
-            {domainKeys.map((dk: number | string) => (
-              <th key={dk} className="px-3 py-2 border-b text-left">Domain {dk}</th>
+            {domainNames.map((domainName, idx) => (
+              <th key={idx} className="px-3 py-2 border-b text-left">{domainName}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {Array.from({ length: paramCount }, (_, paramIndex) => (
-            <tr key={paramIndex} className="odd:bg-gray-50">
-              <td className="px-3 py-2 border-b font-medium">Parameter {paramIndex + 1}</td>
-              {domainKeys.map((_, domainIndex) => {
-                const val = matrix?.[paramIndex]?.[domainIndex]
-                return (
-                  <td key={domainIndex} className="px-3 py-2 border-b">
-                    {val == null || Number.isNaN(val) ? "" : String(val)}
-                  </td>
-                )
-              })}
-            </tr>
-          ))}
+          {resultParameters.map((paramIndex) => {
+            const paramName = PARAMETER_NAMES[paramIndex] || `Parameter ${paramIndex + 1}`
+            return (
+              <tr key={paramIndex} className="odd:bg-gray-50">
+                <td className="px-3 py-2 border-b font-medium">{paramName}</td>
+                {domainKeys.map((_, domainIndex) => {
+                  const val = matrix?.[paramIndex]?.[domainIndex]
+                  return (
+                    <td key={domainIndex} className="px-3 py-2 border-b">
+                      {val == null || Number.isNaN(val) ? "" : String(val)}
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })}
         </tbody>
       </table>
       </div>
     </div>
   )
 }
-

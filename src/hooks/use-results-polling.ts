@@ -33,6 +33,7 @@ export function useResultsPolling({
 
     setIsPolling(true)
     toastShownRef.current = false
+    let hasShownToast = false
 
     const checkResults = async () => {
       try {
@@ -44,7 +45,7 @@ export function useResultsPolling({
             Array.isArray(row) && row.some(val => val !== null && val !== undefined)
           )
 
-          if (hasData) {
+          if (hasData && !hasShownToast) {
             setHasResults(true)
             setIsPolling(false)
             
@@ -56,6 +57,7 @@ export function useResultsPolling({
             // Show toast only once
             if (!toastShownRef.current && onOpenResults) {
               toastShownRef.current = true
+              hasShownToast = true
               toast.success("Results are ready!", {
                 description: "The data from n8n has been processed and is now available.",
                 duration: 10000,
@@ -77,11 +79,14 @@ export function useResultsPolling({
         }
       } catch (error: any) {
         // Silently handle 404 - no results yet
-        if (error?.message?.includes("404") || error?.message?.includes("no_data")) {
-          // Results not ready yet, continue polling
+        if (error?.message?.includes("404") || error?.message?.includes("no_data") || error?.message?.includes("Failed to fetch")) {
+          // Results not ready yet, continue polling silently
           return
         }
-        console.error("Error polling for results:", error)
+        // Only log non-network errors
+        if (!error?.message?.includes("Failed to fetch")) {
+          console.error("Error polling for results:", error)
+        }
       }
     }
 
