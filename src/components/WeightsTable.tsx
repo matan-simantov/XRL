@@ -92,19 +92,16 @@ interface Parameter {
 
 // Organized parameters by category
 const parameters: Parameter[] = [
-  // Competition (12 parameters)
-  { short: "IPOs Worldwide", full: "Number of IPOs in the sector worldwide in the past 5 years (2019–2025)", category: "Competition" },
-  { short: "M&A Worldwide", full: "Number of companies worldwide that were acquired or merged in the past 5 years (2019–2025)", category: "Competition" },
+  // Competition (9 parameters - only those that appear in results: 0-8)
+  { short: "IPOs Worldwide", full: "Number of IPOs in the sector worldwide in the past 5 years (2020–2025)", category: "Competition" },
+  { short: "M&A Worldwide", full: "Number of companies worldwide that were acquired or merged in the past 5 years (2020–2025)", category: "Competition" },
   { short: "Active Companies Worldwide", full: "Number of active companies in the sector worldwide", category: "Competition" },
-  { short: "New Companies Worldwide", full: "Number of new companies in the past 5 years (2019–2025)", category: "Competition" },
-  { short: "Pre-Seed & Seed Worldwide", full: "Number of companies in the sector worldwide that raised Pre-Seed & Seed rounds (2019–2025)", category: "Competition" },
-  { short: "Series A Worldwide", full: "Number of companies in the sector worldwide that raised a Series A round (2019–2025)", category: "Competition" },
-  { short: "Series B–C Worldwide", full: "Number of companies in the sector worldwide that raised Series B–C rounds (2019–2025)", category: "Competition" },
-  { short: "Late-Stage Worldwide", full: "Number of companies in the sector worldwide that raised late-stage rounds (2019–2025)", category: "Competition" },
-  { short: "Series A/Seed Ratio Worldwide", full: "Ratio of companies that raised a Series A round out of those that raised a Seed round in the past 5 years (2019–2025)", category: "Competition" },
-  { short: "New Blood Flow Worldwide", full: '"New blood" flow in the sector worldwide (new activities/active activities) (2019–2025)', category: "Competition" },
+  { short: "New Companies Worldwide", full: "Number of new companies in the past 5 years (2020–2025)", category: "Competition" },
+  { short: "Pre-Seed & Seed Worldwide", full: "Number of companies in the sector worldwide that raised Pre-Seed & Seed rounds (2020–2025)", category: "Competition" },
+  { short: "Series A Worldwide", full: "Number of companies in the sector worldwide that raised a Series A round (2020–2025)", category: "Competition" },
+  { short: "Series B–C Worldwide", full: "Number of companies in the sector worldwide that raised Series B–C rounds (2020–2025)", category: "Competition" },
+  { short: "Series A/Seed Ratio Worldwide", full: "Ratio of companies that raised a Series A round out of those that raised a Seed round in the past 5 years (2020–2025)", category: "Competition" },
   { short: "Avg Company Age Worldwide", full: "Average age of an active company worldwide", category: "Competition" },
-  { short: "Google Trends Change", full: "% change in Google Trends searches in the past 5 years worldwide (2019–2025)", category: "Competition" },
   
   // Global Funding / Financing (5 parameters - indices 9-13, but n8n sends as 10-14)
   // Note: These are displayed at indices 9-13 in the array, but n8n will send them as parameters 10-14
