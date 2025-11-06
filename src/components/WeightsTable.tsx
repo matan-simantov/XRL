@@ -106,13 +106,13 @@ const parameters: Parameter[] = [
   { short: "Avg Company Age Worldwide", full: "Average age of an active company worldwide", category: "Competition" },
   { short: "Google Trends Change", full: "% change in Google Trends searches in the past 5 years worldwide (2019–2025)", category: "Competition" },
   
-  // Global Funding / Financing (6 parameters)
-  { short: "Total Capital Raised", full: "Total capital raised ($) (2019–2025)", category: "Global Funding / Financing" },
-  { short: "Capital: Pre-Seed & Seed", full: "Total capital raised in Pre-Seed & Seed rounds ($) (2019–2025)", category: "Global Funding / Financing" },
-  { short: "Capital: Series A", full: "Total capital raised in Series A rounds ($) (2019–2025)", category: "Global Funding / Financing" },
-  { short: "Capital: Series B–C", full: "Total capital raised in Series B–C rounds ($) (2019–2025)", category: "Global Funding / Financing" },
-  { short: "Capital: Series D–J", full: "Total capital raised in Series D–J rounds ($) (2019–2025)", category: "Global Funding / Financing" },
-  { short: "Avg IPO Amount", full: "Average IPO amount ($) for companies that went public between 2019–2025", category: "Global Funding / Financing" },
+  // Global Funding / Financing (5 parameters - indices 9-13, but n8n sends as 10-14)
+  // Note: These are displayed at indices 9-13 in the array, but n8n will send them as parameters 10-14
+  { short: "Total Capital Raised", full: "Total capital raised ($) (2020–2025)", category: "Global Funding / Financing" },
+  { short: "Capital: Series A", full: "Total capital raised in Series A rounds ($) (2020–2025)", category: "Global Funding / Financing" },
+  { short: "Capital: Series B–C", full: "Total capital raised in Series B–C rounds ($) (2020–2025)", category: "Global Funding / Financing" },
+  { short: "Capital: Series D–J", full: "Total capital raised in Series D–J rounds ($) (2020–2025)", category: "Global Funding / Financing" },
+  { short: "Avg IPO Amount", full: "Average IPO amount ($) for companies that went public between 2020–2025", category: "Global Funding / Financing" },
   
   // Human Capital (5 parameters)
   { short: "Incubators", full: "Number of incubators in the sector", category: "Human Capital" },
@@ -1129,19 +1129,32 @@ Best regards`);
         console.log("First row length (domains):", data.matrix[0]?.length);
         
         domains.forEach((domain, domainIndex) => {
-          convertedData[domain] = {};
+          // Start with existing data if available, don't overwrite with null
+          convertedData[domain] = resultData[domain] ? { ...resultData[domain] } : {};
           data.matrix.forEach((row, paramIndex) => {
             const value = row[domainIndex];
+            // Only update if value is not null/undefined/NaN
+            // This allows receiving data in multiple batches without overwriting existing data
             if (value !== null && value !== undefined && !Number.isNaN(value)) {
-              convertedData[domain][paramIndex] = value;
+              // n8n sends parameters 0-8 and 10-14
+              // We need to map n8n's parameter indices to our array indices
+              // Parameters 0-8 from n8n map to indices 0-8
+              // Parameters 10-14 from n8n map to indices 9-13
+              let targetIndex = paramIndex;
+              if (paramIndex >= 10 && paramIndex <= 14) {
+                // n8n sends 10-14, map to our array indices 9-13
+                targetIndex = paramIndex - 1;
+              }
+              convertedData[domain][targetIndex] = value;
             }
+            // If value is null, keep existing data (don't overwrite)
           });
         });
         
         console.log("Converted resultData - all domains:", Object.keys(convertedData));
         console.log("Parameters in first domain:", Object.keys(convertedData[domains[0]] || {}));
         console.log("Value for param 8 in first domain:", convertedData[domains[0]]?.[8]);
-        console.log("Value for param 10 in first domain:", convertedData[domains[0]]?.[10]);
+        console.log("Value for param 9 (n8n 10) in first domain:", convertedData[domains[0]]?.[9]);
         
         setResultData(convertedData);
         setShowResultsTable(true);
@@ -1186,19 +1199,32 @@ Best regards`);
         console.log("Matrix length (params):", data.matrix.length);
         
         domains.forEach((domain, domainIndex) => {
-          convertedData[domain] = {};
+          // Start with existing data if available, don't overwrite with null
+          convertedData[domain] = resultData[domain] ? { ...resultData[domain] } : {};
           data.matrix.forEach((row, paramIndex) => {
             const value = row[domainIndex];
+            // Only update if value is not null/undefined/NaN
+            // This allows receiving data in multiple batches without overwriting existing data
             if (value !== null && value !== undefined && !Number.isNaN(value)) {
-              convertedData[domain][paramIndex] = value;
+              // n8n sends parameters 0-8 and 10-14
+              // We need to map n8n's parameter indices to our array indices
+              // Parameters 0-8 from n8n map to indices 0-8
+              // Parameters 10-14 from n8n map to indices 9-13
+              let targetIndex = paramIndex;
+              if (paramIndex >= 10 && paramIndex <= 14) {
+                // n8n sends 10-14, map to our array indices 9-13
+                targetIndex = paramIndex - 1;
+              }
+              convertedData[domain][targetIndex] = value;
             }
+            // If value is null, keep existing data (don't overwrite)
           });
         });
         
         console.log("Converted resultData - all domains:", Object.keys(convertedData));
         console.log("Parameters in first domain:", Object.keys(convertedData[domains[0]] || {}));
         console.log("Value for param 8 in first domain:", convertedData[domains[0]]?.[8]);
-        console.log("Value for param 10 in first domain:", convertedData[domains[0]]?.[10]);
+        console.log("Value for param 9 (n8n 10) in first domain:", convertedData[domains[0]]?.[9]);
         
         setResultData(convertedData);
         setShowResultsTable(true);
@@ -1803,8 +1829,9 @@ Best regards`);
               );
             }
             
-            // Active parameters: 0, 1, 2, 3, 4, 5, 6, 7, 8
-            const activeParams = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+            // Active parameters: 0-8 (Competition), 9-13 (Global Funding - n8n sends as 10-14)
+            // Note: n8n sends parameters 10-14, but we display them at indices 9-13
+            const activeParams = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
             
             return (
               <div key="results-table" className="overflow-x-auto">

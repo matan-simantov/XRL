@@ -303,13 +303,44 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
     domainKeys
   })
 
-  // שמירה ב-latestNormalized
-  latestNormalized = {
-    receivedAt: new Date().toISOString(),
-    matrix,
-    domainKeys,
-    paramCount,
-    meta
+  // שמירה ב-latestNormalized - מיזוג עם נתונים קיימים במקום החלפה
+  if (!latestNormalized || !latestNormalized.matrix) {
+    // אם אין נתונים קיימים, שמור את המטריצה החדשה
+    latestNormalized = {
+      receivedAt: new Date().toISOString(),
+      matrix,
+      domainKeys,
+      paramCount,
+      meta
+    }
+  } else {
+    // אם יש נתונים קיימים, מזג את המטריצות
+    // שמור את הנתונים הקיימים, ועדכן רק ערכים שאינם null
+    const existingMatrix = latestNormalized.matrix
+    const mergedMatrix = existingMatrix.map((existingRow, paramIndex) => {
+      const newRow = matrix[paramIndex]
+      if (!newRow) return existingRow // אם אין שורה חדשה, שמור את הקיימת
+      
+      // מזג את השורות - שמור ערכים קיימים, עדכן רק אם הערך החדש אינו null
+      return existingRow.map((existingValue, domainIndex) => {
+        const newValue = newRow[domainIndex]
+        // אם הערך החדש אינו null, עדכן. אחרת שמור את הקיים
+        return (newValue !== null && newValue !== undefined) ? newValue : existingValue
+      })
+    })
+    
+    // הוסף שורות חדשות אם יש פרמטרים חדשים שלא היו קודם
+    for (let i = existingMatrix.length; i < matrix.length; i++) {
+      mergedMatrix.push(matrix[i])
+    }
+    
+    latestNormalized = {
+      receivedAt: new Date().toISOString(),
+      matrix: mergedMatrix,
+      domainKeys: domainKeys || latestNormalized.domainKeys,
+      paramCount: Math.max(paramCount || 0, latestNormalized.paramCount || 0, mergedMatrix.length),
+      meta: { ...latestNormalized.meta, ...meta }
+    }
   }
 
   console.log("Data saved successfully")
