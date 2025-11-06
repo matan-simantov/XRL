@@ -268,6 +268,8 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
     
     if (isNewFormat) {
       console.log("Detected new format: array of {index, parameter, value} objects")
+      console.log("Entries count:", entries.length)
+      console.log("First entry:", entries[0])
       
       // מצא את המקסימום של index (domain) ו-parameter
       let maxParam = 0
@@ -280,15 +282,20 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
         if (domain > maxDomain) maxDomain = domain
       })
       
+      console.log("Max parameter:", maxParam, "Max domain:", maxDomain)
+      
       // יצירת domainKeys מ-1 עד maxDomain
       domainKeys = Array.from({ length: maxDomain }, (_, i) => i + 1)
-      // יצירת מטריצה - paramCount צריך להיות maxParam + 1 (כי parameters מתחילים מ-0 או מ-10)
+      // יצירת מטריצה - paramCount צריך להיות maxParam + 1 (כי parameters הם 10-14)
       paramCount = maxParam + 1
       matrix = Array.from({ length: paramCount }, () => 
         Array.from({ length: domainKeys.length }, () => null)
       )
       
+      console.log("Created matrix:", { rows: paramCount, cols: domainKeys.length })
+      
       // מילוי המטריצה
+      let filledCount = 0
       entries.forEach((entry) => {
         const paramIndex = Number(entry?.parameter) // לא מחסירים 1 כי parameters הם 10-14
         const domainIndex = Number(entry?.index) - 1 // מחסירים 1 כי index מתחיל מ-1
@@ -299,14 +306,24 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
           const numValue = typeof value === "number" ? value : Number(value)
           if (!Number.isNaN(numValue)) {
             matrix[paramIndex][domainIndex] = numValue
+            filledCount++
+          } else {
+            console.warn("Invalid value for param", paramIndex, "domain", domainIndex, ":", value)
           }
+        } else {
+          console.warn("Out of bounds: param", paramIndex, "domain", domainIndex, "matrix size:", paramCount, "x", domainKeys.length)
         }
       })
       
+      console.log("Filled", filledCount, "cells in matrix")
       console.log("Converted new format to matrix:", {
         rows: matrix.length,
         cols: matrix[0]?.length || 0,
-        sample: matrix[10]?.slice(0, 2) // דוגמה לפרמטר 10
+        sampleRow10: matrix[10]?.slice(0, 2), // דוגמה לפרמטר 10
+        sampleRow11: matrix[11]?.slice(0, 2), // דוגמה לפרמטר 11
+        sampleRow12: matrix[12]?.slice(0, 2), // דוגמה לפרמטר 12
+        sampleRow13: matrix[13]?.slice(0, 2), // דוגמה לפרמטר 13
+        sampleRow14: matrix[14]?.slice(0, 2)  // דוגמה לפרמטר 14
       })
     } else {
       // הפורמט הישן
@@ -356,6 +373,7 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
   // שמירה ב-latestNormalized - מיזוג עם נתונים קיימים במקום החלפה
   if (!latestNormalized || !latestNormalized.matrix) {
     // אם אין נתונים קיימים, שמור את המטריצה החדשה
+    console.log("No existing data, saving new matrix")
     latestNormalized = {
       receivedAt: new Date().toISOString(),
       matrix,
@@ -365,24 +383,41 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
     }
   } else {
     // אם יש נתונים קיימים, מזג את המטריצות
+    console.log("Merging with existing data. Existing matrix size:", latestNormalized.matrix.length, "x", latestNormalized.matrix[0]?.length)
+    console.log("New matrix size:", matrix.length, "x", matrix[0]?.length)
+    
     // שמור את הנתונים הקיימים, ועדכן רק ערכים שאינם null
     const existingMatrix = latestNormalized.matrix
-    const mergedMatrix = existingMatrix.map((existingRow, paramIndex) => {
-      const newRow = matrix[paramIndex]
-      if (!newRow) return existingRow // אם אין שורה חדשה, שמור את הקיימת
+    const maxRows = Math.max(existingMatrix.length, matrix.length)
+    const maxCols = Math.max(
+      existingMatrix[0]?.length || 0,
+      matrix[0]?.length || 0
+    )
+    
+    // יצירת מטריצה ממוזגת בגודל מקסימלי
+    const mergedMatrix = Array.from({ length: maxRows }, (_, paramIndex) => {
+      const existingRow = existingMatrix[paramIndex] || []
+      const newRow = matrix[paramIndex] || []
       
       // מזג את השורות - שמור ערכים קיימים, עדכן רק אם הערך החדש אינו null
-      return existingRow.map((existingValue, domainIndex) => {
+      return Array.from({ length: maxCols }, (_, domainIndex) => {
+        const existingValue = existingRow[domainIndex]
         const newValue = newRow[domainIndex]
-        // אם הערך החדש אינו null, עדכן. אחרת שמור את הקיים
-        return (newValue !== null && newValue !== undefined) ? newValue : existingValue
+        
+        // אם הערך החדש אינו null/undefined, עדכן. אחרת שמור את הקיים
+        if (newValue !== null && newValue !== undefined && !Number.isNaN(newValue)) {
+          return newValue
+        }
+        return existingValue !== undefined ? existingValue : null
       })
     })
     
-    // הוסף שורות חדשות אם יש פרמטרים חדשים שלא היו קודם
-    for (let i = existingMatrix.length; i < matrix.length; i++) {
-      mergedMatrix.push(matrix[i])
-    }
+    console.log("Merged matrix size:", mergedMatrix.length, "x", mergedMatrix[0]?.length)
+    console.log("Sample merged data - param 10:", mergedMatrix[10]?.slice(0, 2))
+    console.log("Sample merged data - param 11:", mergedMatrix[11]?.slice(0, 2))
+    console.log("Sample merged data - param 12:", mergedMatrix[12]?.slice(0, 2))
+    console.log("Sample merged data - param 13:", mergedMatrix[13]?.slice(0, 2))
+    console.log("Sample merged data - param 14:", mergedMatrix[14]?.slice(0, 2))
     
     latestNormalized = {
       receivedAt: new Date().toISOString(),
