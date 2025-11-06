@@ -255,38 +255,88 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
       sample: matrix[0]?.slice(0, 3)
     })
   }
-  // פורמט 3: entries array (הישן)
+  // פורמט 3: entries array (הישן או החדש עם index/parameter/value)
   else if (Array.isArray(body.entries) || Array.isArray(body)) {
     const entries = Array.isArray(body) ? body : body.entries
     console.log("Detected format: entries array, converting to matrix")
     
-    // המרה מ-entries למטריצה
-    let maxParam = 0
-    let maxDomain = 0
+    // בדיקה אם זה הפורמט החדש (עם index, parameter, value)
+    const isNewFormat = entries.length > 0 && 
+      entries[0].hasOwnProperty('index') && 
+      entries[0].hasOwnProperty('parameter') && 
+      entries[0].hasOwnProperty('value')
     
-    entries.forEach((entry) => {
-      const param = Number(entry?.parameter) || 0
-      const domain = Number(entry?.index) || 0
-      if (param > maxParam) maxParam = param
-      if (domain > maxDomain) maxDomain = domain
-    })
-    
-    paramCount = maxParam
-    domainKeys = Array.from({ length: maxDomain }, (_, i) => i + 1)
-    matrix = Array.from({ length: paramCount }, () => 
-      Array.from({ length: domainKeys.length }, () => null)
-    )
-    
-    entries.forEach((entry) => {
-      const paramIndex = Number(entry?.parameter) - 1
-      const domainIndex = Number(entry?.index) - 1
-      const value = entry?.value
+    if (isNewFormat) {
+      console.log("Detected new format: array of {index, parameter, value} objects")
       
-      if (paramIndex >= 0 && domainIndex >= 0 && 
-          paramIndex < paramCount && domainIndex < domainKeys.length) {
-        matrix[paramIndex][domainIndex] = typeof value === "number" ? value : Number(value)
-      }
-    })
+      // מצא את המקסימום של index (domain) ו-parameter
+      let maxParam = 0
+      let maxDomain = 0
+      
+      entries.forEach((entry) => {
+        const param = Number(entry?.parameter) || 0
+        const domain = Number(entry?.index) || 0
+        if (param > maxParam) maxParam = param
+        if (domain > maxDomain) maxDomain = domain
+      })
+      
+      // יצירת domainKeys מ-1 עד maxDomain
+      domainKeys = Array.from({ length: maxDomain }, (_, i) => i + 1)
+      // יצירת מטריצה - paramCount צריך להיות maxParam + 1 (כי parameters מתחילים מ-0 או מ-10)
+      paramCount = maxParam + 1
+      matrix = Array.from({ length: paramCount }, () => 
+        Array.from({ length: domainKeys.length }, () => null)
+      )
+      
+      // מילוי המטריצה
+      entries.forEach((entry) => {
+        const paramIndex = Number(entry?.parameter) // לא מחסירים 1 כי parameters הם 10-14
+        const domainIndex = Number(entry?.index) - 1 // מחסירים 1 כי index מתחיל מ-1
+        const value = entry?.value
+        
+        if (paramIndex >= 0 && domainIndex >= 0 && 
+            paramIndex < paramCount && domainIndex < domainKeys.length) {
+          const numValue = typeof value === "number" ? value : Number(value)
+          if (!Number.isNaN(numValue)) {
+            matrix[paramIndex][domainIndex] = numValue
+          }
+        }
+      })
+      
+      console.log("Converted new format to matrix:", {
+        rows: matrix.length,
+        cols: matrix[0]?.length || 0,
+        sample: matrix[10]?.slice(0, 2) // דוגמה לפרמטר 10
+      })
+    } else {
+      // הפורמט הישן
+      let maxParam = 0
+      let maxDomain = 0
+      
+      entries.forEach((entry) => {
+        const param = Number(entry?.parameter) || 0
+        const domain = Number(entry?.index) || 0
+        if (param > maxParam) maxParam = param
+        if (domain > maxDomain) maxDomain = domain
+      })
+      
+      paramCount = maxParam
+      domainKeys = Array.from({ length: maxDomain }, (_, i) => i + 1)
+      matrix = Array.from({ length: paramCount }, () => 
+        Array.from({ length: domainKeys.length }, () => null)
+      )
+      
+      entries.forEach((entry) => {
+        const paramIndex = Number(entry?.parameter) - 1
+        const domainIndex = Number(entry?.index) - 1
+        const value = entry?.value
+        
+        if (paramIndex >= 0 && domainIndex >= 0 && 
+            paramIndex < paramCount && domainIndex < domainKeys.length) {
+          matrix[paramIndex][domainIndex] = typeof value === "number" ? value : Number(value)
+        }
+      })
+    }
   }
   else {
     return res.status(400).json({ 
