@@ -272,22 +272,22 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
       console.log("First entry:", entries[0])
       
       // מצא את המקסימום של index (domain) ו-parameter
-      let maxParam = 0
+      let maxParamNumber = 0
       let maxDomain = 0
       
       entries.forEach((entry) => {
-        const param = Number(entry?.parameter) || 0
+        const paramNumber = Number(entry?.parameter) || 0
         const domain = Number(entry?.index) || 0
-        if (param > maxParam) maxParam = param
+        if (paramNumber > maxParamNumber) maxParamNumber = paramNumber
         if (domain > maxDomain) maxDomain = domain
       })
       
-      console.log("Max parameter:", maxParam, "Max domain:", maxDomain)
+      console.log("Max parameter number:", maxParamNumber, "Max domain:", maxDomain)
       
       // יצירת domainKeys מ-1 עד maxDomain
       domainKeys = Array.from({ length: maxDomain }, (_, i) => i + 1)
-      // יצירת מטריצה - paramCount צריך להיות maxParam + 1 (כי parameters הם 10-14)
-      paramCount = maxParam + 1
+      // יצירת מטריצה באורך מספר הפרמטרים (מספרים 1..N -> אינדקסים 0..N-1)
+      paramCount = maxParamNumber
       matrix = Array.from({ length: paramCount }, () => 
         Array.from({ length: domainKeys.length }, () => null)
       )
@@ -297,7 +297,8 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
       // מילוי המטריצה
       let filledCount = 0
       entries.forEach((entry) => {
-        const paramIndex = Number(entry?.parameter) // לא מחסירים 1 כי parameters הם 10-14
+        const paramNumber = Number(entry?.parameter)
+        const paramIndex = Number.isFinite(paramNumber) ? paramNumber - 1 : -1
         const domainIndex = Number(entry?.index) - 1 // מחסירים 1 כי index מתחיל מ-1
         const value = entry?.value
         
@@ -308,10 +309,10 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
             matrix[paramIndex][domainIndex] = numValue
             filledCount++
           } else {
-            console.warn("Invalid value for param", paramIndex, "domain", domainIndex, ":", value)
+            console.warn("Invalid value for param", paramNumber, "domain", domainIndex + 1, ":", value)
           }
         } else {
-          console.warn("Out of bounds: param", paramIndex, "domain", domainIndex, "matrix size:", paramCount, "x", domainKeys.length)
+          console.warn("Out of bounds: param", paramNumber, "(index", paramIndex, ") domain", domainIndex + 1, "matrix size:", paramCount, "x", domainKeys.length)
         }
       })
       
@@ -319,11 +320,10 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
       console.log("Converted new format to matrix:", {
         rows: matrix.length,
         cols: matrix[0]?.length || 0,
-        sampleRow10: matrix[10]?.slice(0, 2), // דוגמה לפרמטר 10
-        sampleRow11: matrix[11]?.slice(0, 2), // דוגמה לפרמטר 11
-        sampleRow12: matrix[12]?.slice(0, 2), // דוגמה לפרמטר 12
-        sampleRow13: matrix[13]?.slice(0, 2), // דוגמה לפרמטר 13
-        sampleRow14: matrix[14]?.slice(0, 2)  // דוגמה לפרמטר 14
+        sampleRow1: matrix[0]?.slice(0, 2), // פרמטר 1
+        sampleRow4: matrix[3]?.slice(0, 2), // פרמטר 4
+        sampleRow10: matrix[9]?.slice(0, 2), // פרמטר 10
+        sampleRow14: matrix[13]?.slice(0, 2)  // פרמטר 14
       })
     } else {
       // הפורמט הישן

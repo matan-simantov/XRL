@@ -108,7 +108,7 @@ export async function updateLastLogin(username: string): Promise<void> {
 export function setSession(username: string) {
   try {
     if (typeof window !== "undefined" && localStorage) {
-      localStorage.setItem(SESSION_KEY, JSON.stringify({ username, at: new Date().toISOString() }));
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ username, at: new Date().toISOString() }));
     }
   } catch (error) {
     console.warn("Failed to set session:", error);

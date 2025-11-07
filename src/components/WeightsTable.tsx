@@ -960,6 +960,16 @@ Best regards`);
     });
   };
 
+  const formatNumberWithOneDecimal = (value: number, forceDecimal = false): string => {
+    if (!Number.isFinite(value)) {
+      return "-";
+    }
+    const options: Intl.NumberFormatOptions = forceDecimal
+      ? { minimumFractionDigits: 1, maximumFractionDigits: 1 }
+      : { maximumFractionDigits: 1 };
+    return new Intl.NumberFormat(undefined, options).format(value);
+  };
+
   // Calculate final weight for a parameter row
   const calculateFinalWeight = (paramIndex: number): number => {
     // Calculate average LLM weight (only enabled LLMs)
@@ -1002,11 +1012,17 @@ Best regards`);
     
     const humanAvg = humanCount > 0 ? humanSum / humanCount : 0;
     
-    // Weighted average: LLM vs Human (including Me)
-    const llmWeightPercent = llmWeight / 100;
-    const humanWeightPercent = (100 - llmWeight) / 100;
+    // Weighted average: LLM vs Human (including Me), normalized based on active columns
+    const rawLlmWeight = llmCount > 0 ? llmWeight / 100 : 0;
+    const rawHumanWeight = humanCount > 0 ? (100 - llmWeight) / 100 : 0;
+    const totalWeight = rawLlmWeight + rawHumanWeight;
+    if (totalWeight === 0) {
+      return 0;
+    }
+    const normalizedLlmWeight = rawLlmWeight / totalWeight;
+    const normalizedHumanWeight = rawHumanWeight / totalWeight;
     
-    return llmAvg * llmWeightPercent + humanAvg * humanWeightPercent;
+    return llmAvg * normalizedLlmWeight + humanAvg * normalizedHumanWeight;
   };
 
   const handlePreviousDomain = () => {
@@ -1101,11 +1117,17 @@ Best regards`);
     
     const humanAvg = humanCount > 0 ? humanSum / humanCount : 0;
     
-    // Weighted average: LLM vs Human (including Me)
-    const llmWeightPercent = llmWeight / 100;
-    const humanWeightPercent = (100 - llmWeight) / 100;
+    // Weighted average: LLM vs Human (including Me), normalized based on active columns
+    const rawLlmWeight = llmCount > 0 ? llmWeight / 100 : 0;
+    const rawHumanWeight = humanCount > 0 ? (100 - llmWeight) / 100 : 0;
+    const totalWeight = rawLlmWeight + rawHumanWeight;
+    if (totalWeight === 0) {
+      return 0;
+    }
+    const normalizedLlmWeight = rawLlmWeight / totalWeight;
+    const normalizedHumanWeight = rawHumanWeight / totalWeight;
     
-    return llmAvg * llmWeightPercent + humanAvg * humanWeightPercent;
+    return llmAvg * normalizedLlmWeight + humanAvg * normalizedHumanWeight;
   };
 
   // Removed dummy results generation - only real data from n8n
@@ -1133,16 +1155,7 @@ Best regards`);
             // Only update if value is not null/undefined/NaN
             // This allows receiving data in multiple batches without overwriting existing data
             if (value !== null && value !== undefined && !Number.isNaN(value)) {
-              // n8n sends parameters 0-8 and 10-14
-              // We need to map n8n's parameter indices to our array indices
-              // Parameters 0-8 from n8n map to indices 0-8
-              // Parameters 10-14 from n8n map to indices 9-13
-              let targetIndex = paramIndex;
-              if (paramIndex >= 10 && paramIndex <= 14) {
-                // n8n sends 10-14, map to our array indices 9-13
-                targetIndex = paramIndex - 1;
-              }
-              convertedData[domain][targetIndex] = value;
+              convertedData[domain][paramIndex] = value;
             }
             // If value is null, keep existing data (don't overwrite)
           });
@@ -1203,16 +1216,7 @@ Best regards`);
             // Only update if value is not null/undefined/NaN
             // This allows receiving data in multiple batches without overwriting existing data
             if (value !== null && value !== undefined && !Number.isNaN(value)) {
-              // n8n sends parameters 0-8 and 10-14
-              // We need to map n8n's parameter indices to our array indices
-              // Parameters 0-8 from n8n map to indices 0-8
-              // Parameters 10-14 from n8n map to indices 9-13
-              let targetIndex = paramIndex;
-              if (paramIndex >= 10 && paramIndex <= 14) {
-                // n8n sends 10-14, map to our array indices 9-13
-                targetIndex = paramIndex - 1;
-              }
-              convertedData[domain][targetIndex] = value;
+              convertedData[domain][paramIndex] = value;
             }
             // If value is null, keep existing data (don't overwrite)
           });
@@ -1924,23 +1928,19 @@ Best regards`);
                                       if (value === undefined || value === null) return "-";
                                       
                                       const num = Number(value);
+                                      if (Number.isNaN(num)) return "-";
                                       
                                       // Format based on parameter type
                                       if (paramIndex === 7) {
                                         // Series A/Seed Ratio - value is a decimal ratio (0.38 = 38%)
-                                        // Convert to percentage
-                                        return `${(num * 100).toFixed(2)}%`;
+                                        return `${formatNumberWithOneDecimal(num * 100, true)}%`;
                                       }
                                       if (paramIndex === 8) {
-                                        // Average Company Age - value is already in years
-                                        // Just show as number with 2 decimal places, no multiplication
-                                        return num.toFixed(2);
+                                        // Average Company Age - always show one decimal place
+                                        return formatNumberWithOneDecimal(num, true);
                                       }
-                                      // For other numbers, show up to 2 decimal places if needed
-                                      if (Number.isInteger(num)) {
-                                        return num.toString(); // Whole numbers
-                                      }
-                                      return num.toFixed(2); // Numbers with decimals - max 2 places
+                                      // For other numbers, show up to one decimal place (if needed)
+                                      return formatNumberWithOneDecimal(num);
                                     })()}
                                   </td>
                                 );
