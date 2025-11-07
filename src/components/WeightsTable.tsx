@@ -88,28 +88,29 @@ interface Parameter {
   short: string;
   full: string;
   category: CategoryName;
+  format?: "percentage" | "currency" | "count";
 }
 
 // Organized parameters by category
 const parameters: Parameter[] = [
   // Competition (9 parameters - only those that appear in results: 0-8)
-  { short: "IPOs Worldwide", full: "Number of IPOs in the sector worldwide in the past 5 years (2020–2025)", category: "Competition" },
-  { short: "M&A Worldwide", full: "Number of companies worldwide that were acquired or merged in the past 5 years (2020–2025)", category: "Competition" },
-  { short: "Active Companies Worldwide", full: "Number of active companies in the sector worldwide", category: "Competition" },
-  { short: "New Companies Worldwide", full: "Number of new companies in the past 5 years (2020–2025)", category: "Competition" },
-  { short: "Pre-Seed & Seed Worldwide", full: "Number of companies in the sector worldwide that raised Pre-Seed & Seed rounds (2020–2025)", category: "Competition" },
-  { short: "Series A Worldwide", full: "Number of companies in the sector worldwide that raised a Series A round (2020–2025)", category: "Competition" },
-  { short: "Series B–C Worldwide", full: "Number of companies in the sector worldwide that raised Series B–C rounds (2020–2025)", category: "Competition" },
-  { short: "Series A/Seed Ratio Worldwide", full: "Ratio of companies that raised a Series A round out of those that raised a Seed round in the past 5 years (2020–2025)", category: "Competition" },
+  { short: "IPOs Worldwide", full: "Number of IPOs in the sector worldwide in the past 5 years (2020–2025)", category: "Competition", format: "count" },
+  { short: "M&A Worldwide", full: "Number of companies worldwide that were acquired or merged in the past 5 years (2020–2025)", category: "Competition", format: "count" },
+  { short: "Active Companies Worldwide", full: "Number of active companies in the sector worldwide", category: "Competition", format: "count" },
+  { short: "New Companies Worldwide", full: "Number of new companies in the past 5 years (2020–2025)", category: "Competition", format: "count" },
+  { short: "Pre-Seed & Seed Worldwide", full: "Number of companies in the sector worldwide that raised Pre-Seed & Seed rounds (2020–2025)", category: "Competition", format: "count" },
+  { short: "Series A Worldwide", full: "Number of companies in the sector worldwide that raised a Series A round (2020–2025)", category: "Competition", format: "count" },
+  { short: "Series B–C Worldwide", full: "Number of companies in the sector worldwide that raised Series B–C rounds (2020–2025)", category: "Competition", format: "count" },
+  { short: "Series A/Seed Ratio Worldwide", full: "Ratio of companies that raised a Series A round out of those that raised a Seed round in the past 5 years (2020–2025)", category: "Competition", format: "percentage" },
   { short: "Avg Company Age Worldwide", full: "Average age of an active company worldwide", category: "Competition" },
   
   // Global Funding / Financing (5 parameters - indices 9-13, but n8n sends as 10-14)
   // Note: These are displayed at indices 9-13 in the array, but n8n will send them as parameters 10-14
-  { short: "Total Capital Raised", full: "Total capital raised ($) (2020–2025)", category: "Global Funding / Financing" },
-  { short: "Capital: Series A", full: "Total capital raised in Series A rounds ($) (2020–2025)", category: "Global Funding / Financing" },
-  { short: "Capital: Series B–C", full: "Total capital raised in Series B–C rounds ($) (2020–2025)", category: "Global Funding / Financing" },
-  { short: "Capital: Series D–J", full: "Total capital raised in Series D–J rounds ($) (2020–2025)", category: "Global Funding / Financing" },
-  { short: "Avg IPO Amount", full: "Average IPO amount ($) for companies that went public between 2020–2025", category: "Global Funding / Financing" },
+  { short: "Total Capital Raised", full: "Total capital raised ($) (2020–2025)", category: "Global Funding / Financing", format: "currency" },
+  { short: "Capital: Series A", full: "Total capital raised in Series A rounds ($) (2020–2025)", category: "Global Funding / Financing", format: "currency" },
+  { short: "Capital: Series B–C", full: "Total capital raised in Series B–C rounds ($) (2020–2025)", category: "Global Funding / Financing", format: "currency" },
+  { short: "Capital: Series D–J", full: "Total capital raised in Series D–J rounds ($) (2020–2025)", category: "Global Funding / Financing", format: "currency" },
+  { short: "Avg IPO Amount", full: "Average IPO amount ($) for companies that went public between 2020–2025", category: "Global Funding / Financing", format: "currency" },
   
   // Human Capital (5 parameters)
   { short: "Incubators", full: "Number of incubators in the sector", category: "Human Capital" },
@@ -965,9 +966,33 @@ Best regards`);
       return "-";
     }
     const options: Intl.NumberFormatOptions = forceDecimal
-      ? { minimumFractionDigits: 1, maximumFractionDigits: 1 }
-      : { maximumFractionDigits: 1 };
+      ? { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: true }
+      : { maximumFractionDigits: 1, useGrouping: true };
     return new Intl.NumberFormat(undefined, options).format(value);
+  };
+
+  const formatCount = (value: number): string => {
+    if (!Number.isFinite(value)) {
+      return "-";
+    }
+    return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0, useGrouping: true }).format(value);
+  };
+
+  const formatResultValue = (value: number, paramIndex: number): string => {
+    if (!Number.isFinite(value)) {
+      return "-";
+    }
+    const formatType = parameters[paramIndex]?.format;
+    switch (formatType) {
+      case "percentage":
+        return `${formatNumberWithOneDecimal(value * 100, true)}%`;
+      case "currency":
+        return `${formatNumberWithOneDecimal(value, true)} $`;
+      case "count":
+        return formatCount(value);
+      default:
+        return formatNumberWithOneDecimal(value);
+    }
   };
 
   // Calculate final weight for a parameter row
@@ -1715,8 +1740,8 @@ Best regards`);
                       ? "text-red-600 dark:text-red-400"
                       : ""
                   }`}>
-                    {calculateUserTotal().toFixed(1)}
-                    {!isMeDisabled && Math.abs(calculateUserTotal() - 100) > 0.05 && calculateUserTotal() > 0 && (
+                    {formatNumberWithOneDecimal(Math.abs(calculateUserTotal() - 100) <= 0.1 ? 100 : calculateUserTotal(), true)}
+                    {!isMeDisabled && Math.abs(calculateUserTotal() - 100) > 0.1 && calculateUserTotal() > 0 && (
                       <span className="text-xs ml-1">(!)</span>
                     )}
                   </td>
@@ -1726,9 +1751,13 @@ Best regards`);
                       return acc + (value || 0);
                     }, 0);
                     const isDisabled = disabledLlms.has(llm);
+                    const normalizedSum = Math.abs(sum - 100) <= 0.1 ? 100 : sum;
+                    const displaySum = formatNumberWithOneDecimal(normalizedSum, true);
+                    const isOff = Math.abs(sum - 100) > 0.1 && sum > 0;
                     return (
-                      <td key={idx} className={`text-center p-1.5 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : 'text-foreground'}`}>
-                        {Math.round(sum)}
+                      <td key={idx} className={`text-center p-1.5 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : 'text-foreground'} ${isOff ? 'text-red-600 dark:text-red-400' : ''}`}>
+                        {displaySum}
+                        {isOff && <span className="text-xs ml-1">(!)</span>}
                       </td>
                     );
                   })}
@@ -1739,10 +1768,13 @@ Best regards`);
                     }, 0);
                     const hasData = parameters.some((_, paramIndex) => data[paramIndex][participant.name] !== null);
                     const isDisabled = disabledParticipants.has(participant.name);
+                    const normalizedSum = Math.abs(sum - 100) <= 0.1 ? 100 : sum;
+                    const displaySum = formatNumberWithOneDecimal(normalizedSum, true);
+                    const isOff = Math.abs(sum - 100) > 0.1 && sum > 0;
                     return (
-                      <td key={`participant-total-${idx}`} className={`text-center p-1.5 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : ''}`}>
+                      <td key={`participant-total-${idx}`} className={`text-center p-1.5 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : ''} ${isOff ? 'text-red-600 dark:text-red-400' : ''}`}>
                         {hasData ? (
-                          <span className={`font-semibold ${isDisabled ? 'text-muted-foreground' : 'text-foreground'}`}>{Math.round(sum)}</span>
+                          <span className={`font-semibold ${isDisabled ? 'text-muted-foreground' : 'text-foreground'}`}>{displaySum}{isOff && <span className="text-xs ml-1">(!)</span>}</span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
@@ -1750,7 +1782,7 @@ Best regards`);
                     );
                   })}
                   <td className="text-center p-1.5 text-foreground text-sm font-semibold bg-primary/10">
-                    {parameters.reduce((sum, _, paramIndex) => sum + calculateFinalWeight(paramIndex), 0).toFixed(1)}
+                    {formatNumberWithOneDecimal(parameters.reduce((sum, _, paramIndex) => sum + calculateFinalWeight(paramIndex), 0), true)}
                   </td>
                 </tr>
               </tbody>
@@ -1930,17 +1962,7 @@ Best regards`);
                                       const num = Number(value);
                                       if (Number.isNaN(num)) return "-";
                                       
-                                      // Format based on parameter type
-                                      if (paramIndex === 7) {
-                                        // Series A/Seed Ratio - value is a decimal ratio (0.38 = 38%)
-                                        return `${formatNumberWithOneDecimal(num * 100, true)}%`;
-                                      }
-                                      if (paramIndex === 8) {
-                                        // Average Company Age - always show one decimal place
-                                        return formatNumberWithOneDecimal(num, true);
-                                      }
-                                      // For other numbers, show up to one decimal place (if needed)
-                                      return formatNumberWithOneDecimal(num);
+                                      return formatResultValue(num, paramIndex);
                                     })()}
                                   </td>
                                 );
