@@ -1640,17 +1640,25 @@ Best regards`);
                         </td>
                         <td className={`p-1.5 ${isMeDisabled ? 'bg-muted/30' : ''}`} style={isMeDisabled ? {} : { backgroundColor: `var(--primary-ghost-hex)` }} onClick={(e) => e.stopPropagation()}>
                           <div className="flex flex-col items-center gap-1">
-                            <Input
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.1"
-                              value={categoryWeight.toFixed(1)}
-                              onChange={(e) => handleCategoryWeightChange(category, parseFloat(e.target.value) || 0)}
-                              className="w-18 h-7 text-center text-xs font-semibold"
-                              style={isMeDisabled ? {} : { borderColor: `var(--primary-hex)` }}
-                              disabled={isMeDisabled}
-                            />
+                            {(() => {
+                              const meCategoryTotal = categoryParams.reduce((sum, paramIndex) => {
+                                const v = userWeights[currentDomain]?.[paramIndex]
+                                return sum + (v !== null && v !== undefined ? v : 0)
+                              }, 0)
+                              return (
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="0.1"
+                                  value={meCategoryTotal.toFixed(1)}
+                                  onChange={(e) => handleCategoryWeightChange(category, parseFloat(e.target.value) || 0)}
+                                  className="w-18 h-7 text-center text-xs font-semibold"
+                                  style={isMeDisabled ? {} : { borderColor: `var(--primary-hex)` }}
+                                  disabled={isMeDisabled}
+                                />
+                              )
+                            })()}
                           </div>
                         </td>
                         {/* LLM category totals */}
