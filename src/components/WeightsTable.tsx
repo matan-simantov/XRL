@@ -368,6 +368,24 @@ export const WeightsTable = ({ llms = [], participants = [], domains = [], initi
   const [viewMode, setViewMode] = useState<'weights' | 'results'>('weights');
   const [hasRealData, setHasRealData] = useState(false);
   
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsInitialLoading(false), 5000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isInitialLoading) {
+    return (
+      <Card className="mt-6 shadow-lg mx-auto w-full max-w-[95vw] p-8">
+        <div className="flex flex-col items-center justify-center h-64 space-y-4">
+          <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+          <p className="text-muted-foreground">Preparing weights table...</p>
+        </div>
+      </Card>
+    );
+  }
+
   // Track which categories are expanded (default: all closed)
   const [expandedCategories, setExpandedCategories] = useState<Set<CategoryName>>(new Set());
   
@@ -383,7 +401,110 @@ export const WeightsTable = ({ llms = [], participants = [], domains = [], initi
     });
   };
   
-  // Generate data for all domains (must be before userWeights)
+  const formatResultValue = (value: number, paramIndex: number): string => {
+    if (!Number.isFinite(value)) {
+      return "-";
+    }
+    const formatType = parameters[paramIndex]?.format;
+    switch (formatType) {
+      case "percentage":
+        return `${formatNumberWithOneDecimal(value * 100, true)}%`;
+      case "currency":
+        return `${formatNumberWithOneDecimal(value, true)} $`;
+      case "count":
+        return formatCount(value);
+      default:
+        return formatNumberWithOneDecimal(value);
+    }
+  };
+
+  const normalizeColumnWeights = (values: Array<number | null | undefined>): Array<number | null> => {
+    const nonNullIndices: number[] = [];
+    let total = 0;
+    values.forEach((value, idx) => {
+      if (value !== null && value !== undefined) {
+        total += value;
+        nonNullIndices.push(idx);
+      }
+    });
+
+    if (nonNullIndices.length === 0 || total === 0) {
+      return values.map((value) => (value === undefined ? null : value));
+    }
+
+    if (Math.abs(total - 100) <= 0.05) {
+      return values.map((value) => (value === undefined ? null : value));
+    }
+
+    const factor = 100 / total;
+    let running = 0;
+    const normalized = values.map((value) => {
+      if (value === null || value === undefined) {
+        return null;
+      }
+      const scaled = parseFloat((value * factor).toFixed(1));
+      running += scaled;
+      return scaled;
+    });
+
+    const diff = parseFloat((100 - running).toFixed(1));
+    if (Math.abs(diff) > 0.05 && nonNullIndices.length > 0) {
+      const lastIdx = nonNullIndices[nonNullIndices.length - 1];
+      const current = normalized[lastIdx] ?? 0;
+      normalized[lastIdx] = parseFloat((current + diff).toFixed(1));
+    }
+
+    return normalized;
+  };
+
+  const normalizeDomainWeights = (domainData: Record<number, Record<string, number | null>> = {}) => {
+    let changed = false;
+    const normalizedDomainData: Record<number, Record<string, number | null>> = {};
+
+    parameters.forEach((_, paramIndex) => {
+      normalizedDomainData[paramIndex] = { ...(domainData[paramIndex] || {}) };
+    });
+
+    llms.forEach((llm) => {
+      const columnValues = parameters.map((_, paramIndex) => normalizedDomainData[paramIndex]?.[llm] ?? null);
+      const normalizedValues = normalizeColumnWeights(columnValues);
+      normalizedValues.forEach((val, paramIndex) => {
+        const prevValue = normalizedDomainData[paramIndex]?.[llm];
+        if (prevValue !== val) {
+          normalizedDomainData[paramIndex] = {
+            ...(normalizedDomainData[paramIndex] || {}),
+            [llm]: val,
+          };
+          changed = true;
+        }
+      });
+    });
+
+    return { normalizedDomainData: changed ? normalizedDomainData : domainData, changed };
+  };
+
+  const normalizeAllDomainsWeights = (
+    domainsData: Record<string, Record<number, Record<string, number | null>>> = {}
+  ) => {
+    let changed = false;
+    const normalizedData: Record<string, Record<number, Record<string, number | null>>> = {};
+
+    Object.keys(domainsData).forEach((domain) => {
+      const domainData = domainsData[domain];
+      if (!domainData) {
+        normalizedData[domain] = domainData;
+        return;
+      }
+      const { normalizedDomainData, changed: domainChanged } = normalizeDomainWeights(domainData);
+      normalizedData[domain] = normalizedDomainData;
+      if (domainChanged) {
+        changed = true;
+      }
+    });
+
+    return changed ? normalizedData : domainsData;
+  };
+
   const generateInitialDomainsData = () => {
     try {
       const domainsData: Record<string, Record<number, Record<string, number | null>>> = {};
@@ -421,7 +542,8 @@ export const WeightsTable = ({ llms = [], participants = [], domains = [], initi
           });
         }
         
-        domainsData[domain] = rows;
+        const { normalizedDomainData } = normalizeDomainWeights(rows);
+        domainsData[domain] = normalizedDomainData;
       });
       
       return domainsData;
@@ -460,7 +582,7 @@ export const WeightsTable = ({ llms = [], participants = [], domains = [], initi
     // Always ensure we have domain data
     if (savedState?.allDomainsData) {
       // Load saved state for this specific run
-      setAllDomainsData(savedState.allDomainsData);
+      setAllDomainsData(normalizeAllDomainsWeights(savedState.allDomainsData));
     } else {
       // Generate fresh data if not available
       setAllDomainsData(generateInitialDomainsData());
@@ -864,7 +986,7 @@ export const WeightsTable = ({ llms = [], participants = [], domains = [], initi
         newData[domain] = domainData;
       });
       
-      return newData;
+      return normalizeAllDomainsWeights(newData);
     });
     
     toast.success("Participants data refreshed", {
@@ -1037,9 +1159,19 @@ Best regards`);
     
     const humanAvg = humanCount > 0 ? humanSum / humanCount : 0;
     
+    if (humanCount > 0 && llmCount === 0) {
+      return humanAvg;
+    }
+    if (llmCount > 0 && humanCount === 0) {
+      return llmAvg;
+    }
+    if (llmCount === 0 && humanCount === 0) {
+      return 0;
+    }
+    
     // Weighted average: LLM vs Human (including Me), normalized based on active columns
-    const rawLlmWeight = llmCount > 0 ? llmWeight / 100 : 0;
-    const rawHumanWeight = humanCount > 0 ? (100 - llmWeight) / 100 : 0;
+    const rawLlmWeight = llmWeight / 100;
+    const rawHumanWeight = (100 - llmWeight) / 100;
     const totalWeight = rawLlmWeight + rawHumanWeight;
     if (totalWeight === 0) {
       return 0;
@@ -1142,9 +1274,19 @@ Best regards`);
     
     const humanAvg = humanCount > 0 ? humanSum / humanCount : 0;
     
+    if (humanCount > 0 && llmCount === 0) {
+      return humanAvg;
+    }
+    if (llmCount > 0 && humanCount === 0) {
+      return llmAvg;
+    }
+    if (llmCount === 0 && humanCount === 0) {
+      return 0;
+    }
+    
     // Weighted average: LLM vs Human (including Me), normalized based on active columns
-    const rawLlmWeight = llmCount > 0 ? llmWeight / 100 : 0;
-    const rawHumanWeight = humanCount > 0 ? (100 - llmWeight) / 100 : 0;
+    const rawLlmWeight = llmWeight / 100;
+    const rawHumanWeight = (100 - llmWeight) / 100;
     const totalWeight = rawLlmWeight + rawHumanWeight;
     if (totalWeight === 0) {
       return 0;
