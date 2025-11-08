@@ -1,7 +1,7 @@
 import { useState, useEffect, Fragment } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { X, Mail, ChevronLeft, ChevronRight, RefreshCw, Eye, EyeOff, FileText, CheckCircle, MoreVertical, HelpCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Mail, ChevronLeft, ChevronRight, RefreshCw, Eye, EyeOff, FileText, CheckCircle, MoreVertical, HelpCircle, ChevronDown, ChevronUp, Info } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -1556,7 +1556,7 @@ Best regards`);
                                     className="h-4 w-4"
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    <HelpCircle className="h-3 w-3" />
+                                    <Info className="h-3 w-3" />
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom" className="max-w-md">
@@ -1600,7 +1600,7 @@ Best regards`);
                                       className="h-4 w-4"
                                       onClick={(e) => e.stopPropagation()}
                                     >
-                                      <HelpCircle className="h-3 w-3" />
+                                      <Info className="h-3 w-3" />
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent side="bottom" className="max-w-md">
