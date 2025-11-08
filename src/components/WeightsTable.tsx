@@ -317,29 +317,6 @@ const generateWeightsForColumn = (): number[] => {
 };
 
 export const WeightsTable = ({ llms = [], participants = [], domains = [], initialLlmWeight = 50, formData, onClose }: WeightsTableProps) => {
-  // Early return if essential props are missing or invalid
-  if (!domains || domains.length === 0) {
-    return (
-      <Card className="mt-6 shadow-lg mx-auto w-full max-w-[95vw] p-8">
-        <div className="flex flex-col items-center justify-center h-64 space-y-4">
-          <p className="text-muted-foreground">No domains available</p>
-          <Button onClick={onClose} variant="outline">Close</Button>
-        </div>
-      </Card>
-    );
-  }
-
-  if (!llms || llms.length === 0) {
-    return (
-      <Card className="mt-6 shadow-lg mx-auto w-full max-w-[95vw] p-8">
-        <div className="flex flex-col items-center justify-center h-64 space-y-4">
-          <p className="text-muted-foreground">No LLMs available</p>
-          <Button onClick={onClose} variant="outline">Close</Button>
-        </div>
-      </Card>
-    );
-  }
-
   const { getButtonClasses } = useButtonColor();
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showParametersDialog, setShowParametersDialog] = useState(false);
@@ -370,6 +347,9 @@ export const WeightsTable = ({ llms = [], participants = [], domains = [], initi
   
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
+  // Track which categories are expanded (default: all closed)
+  const [expandedCategories, setExpandedCategories] = useState<Set<CategoryName>>(new Set());
+
   useEffect(() => {
     const timer = setTimeout(() => setIsInitialLoading(false), 5000);
     return () => clearTimeout(timer);
@@ -386,8 +366,28 @@ export const WeightsTable = ({ llms = [], participants = [], domains = [], initi
     );
   }
 
-  // Track which categories are expanded (default: all closed)
-  const [expandedCategories, setExpandedCategories] = useState<Set<CategoryName>>(new Set());
+  // Early return if essential props are missing or invalid
+  if (!domains || domains.length === 0) {
+    return (
+      <Card className="mt-6 shadow-lg mx-auto w-full max-w-[95vw] p-8">
+        <div className="flex flex-col items-center justify-center h-64 space-y-4">
+          <p className="text-muted-foreground">No domains available</p>
+          <Button onClick={onClose} variant="outline">Close</Button>
+        </div>
+      </Card>
+    );
+  }
+
+  if (!llms || llms.length === 0) {
+    return (
+      <Card className="mt-6 shadow-lg mx-auto w-full max-w-[95vw] p-8">
+        <div className="flex flex-col items-center justify-center h-64 space-y-4">
+          <p className="text-muted-foreground">No LLMs available</p>
+          <Button onClick={onClose} variant="outline">Close</Button>
+        </div>
+      </Card>
+    );
+  }
   
   const toggleCategory = (category: CategoryName) => {
     setExpandedCategories((prev) => {
