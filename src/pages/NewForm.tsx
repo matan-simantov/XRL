@@ -76,7 +76,7 @@ const NewForm = () => {
   useEffect(() => {
     if (submitSuccess) {
       setPostSubmitDelayDone(false)
-      const t = setTimeout(() => setPostSubmitDelayDone(true), 5000)
+      const t = setTimeout(() => setPostSubmitDelayDone(true), 15000)
       return () => clearTimeout(t)
     }
   }, [submitSuccess])

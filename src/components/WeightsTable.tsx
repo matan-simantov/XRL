@@ -1727,15 +1727,27 @@ Best regards`);
                         const param = parameters[paramIndex];
                         return (
                           <tr key={paramIndex} className="border-b border-border hover:bg-accent/50 transition-colors">
-                            <td className="p-2 bg-background text-center whitespace-nowrap" style={{ width: 'auto', minWidth: '150px', maxWidth: '200px' }}>
-                              <TooltipProvider>
-                                <div className="flex items-center justify-center gap-2">
+                            <td className="p-2 bg-background text-center align-top" style={{ width: 'auto', minWidth: '150px', maxWidth: '220px' }}>
+                              <div className="flex items-start justify-center gap-2 max-w-[200px] mx-auto">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="font-medium text-foreground cursor-help text-sm leading-snug whitespace-normal break-words">
+                                        {param.short}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" className="max-w-lg whitespace-normal">
+                                      <p className="break-words text-sm leading-relaxed">{param.full}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                <TooltipProvider>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-5 w-5"
+                                        className="h-5 w-5 text-muted-foreground flex-shrink-0"
                                         onClick={(e) => e.stopPropagation()}
                                       >
                                         <HelpCircle className="h-4 w-4" />
@@ -1745,59 +1757,28 @@ Best regards`);
                                       <p className="font-medium">Source: {RESULT_PARAMETER_SOURCES[paramIndex] || "Unknown"}</p>
                                     </TooltipContent>
                                   </Tooltip>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className="font-medium text-foreground cursor-help text-sm">
-                                        {param.short}
-                                      </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="right" className="max-w-lg whitespace-normal">
-                                      <p className="break-words text-sm leading-relaxed">{param.full}</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </div>
-                              </TooltipProvider>
-                            </td>
-                            <td className={`p-1.5 ${isMeDisabled ? 'bg-muted/30' : ''}`} style={isMeDisabled ? {} : { backgroundColor: `var(--primary-ghost-hex)` }}>
-                              <div className="flex justify-center items-center">
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  max="100"
-                                  step="0.1"
-                                  value={userWeights[currentDomain]?.[paramIndex] !== null && userWeights[currentDomain]?.[paramIndex] !== undefined ? userWeights[currentDomain][paramIndex]!.toFixed(1) : ""}
-                                  onChange={(e) => handleUserWeightChange(paramIndex, e.target.value)}
-                                  className={`w-16 h-7 text-center text-xs font-semibold ${isMeDisabled ? 'opacity-50' : ''}`}
-                                  style={isMeDisabled ? {} : { borderColor: `var(--primary-hex)` }}
-                                  placeholder="-"
-                                  disabled={isMeDisabled}
-                                />
+                                </TooltipProvider>
                               </div>
                             </td>
-                            {llms.map((llm, colIndex) => {
-                              const isDisabled = disabledLlms.has(llm);
+                            {domains.map((domain, domainIdx) => {
+                              const value = resultData[domain]?.[paramIndex];
                               return (
-                                <td key={colIndex} className={`text-center p-1.5 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : 'text-foreground'}`}>
-                                  {data[paramIndex][llm]}
+                                <td key={domainIdx} className="text-center p-2 text-foreground text-sm font-semibold bg-green-50 dark:bg-green-950/30 align-top" style={{ maxWidth: '200px' }}>
+                                  {(() => {
+                                    if (value === undefined || value === null) return "-";
+                                    
+                                    const num = Number(value);
+                                    if (Number.isNaN(num)) return "-";
+                                    
+                                    return (
+                                      <span className="block whitespace-normal break-words leading-snug">
+                                        {formatResultValue(num, paramIndex)}
+                                      </span>
+                                    );
+                                  })()}
                                 </td>
                               );
                             })}
-                            {participants.map((participant, colIndex) => {
-                              const value = data[paramIndex][participant.name];
-                              const isDisabled = disabledParticipants.has(participant.name);
-                              return (
-                                <td key={`participant-${colIndex}`} className={`text-center p-1.5 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : ''}`}>
-                                  {value !== null && value !== undefined ? (
-                                    <span className={isDisabled ? 'text-muted-foreground' : 'text-foreground'}>{value}</span>
-                                  ) : (
-                                    <span className="text-muted-foreground">-</span>
-                                  )}
-                                </td>
-                              );
-                            })}
-                            <td className="text-center p-1.5 text-foreground text-sm font-semibold bg-primary/5">
-                              {calculateFinalWeight(paramIndex).toFixed(1)}
-                            </td>
                           </tr>
                         );
                       })}
