@@ -122,7 +122,7 @@ const Dashboard = () => {
                           window.location.href = "/dashboard/new-form?resume=true";
                         }}
                       >
-                        <CardHeader>
+                    <CardHeader>
                           <CardTitle className="text-lg line-clamp-1 flex items-center gap-2">
                             <Clock className="h-4 w-4 text-muted-foreground" />
                             {draft.state?.domains?.join(", ") || draft.state?.sector || "Untitled Draft"}
@@ -130,8 +130,8 @@ const Dashboard = () => {
                           <CardDescription className="flex items-center gap-2 mt-2">
                             <Calendar className="h-4 w-4" />
                             Updated {format(new Date(draft.updatedAt), "MMM dd, yyyy")}
-                          </CardDescription>
-                        </CardHeader>
+                      </CardDescription>
+                    </CardHeader>
                         <CardContent>
                           <Button 
                             variant="outline" 
@@ -145,7 +145,7 @@ const Dashboard = () => {
                             Resume Draft
                           </Button>
                         </CardContent>
-                      </Card>
+                  </Card>
                     ))}
                   </div>
                 </div>
@@ -158,16 +158,16 @@ const Dashboard = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {recentSearches.map((search) => (
                       <Link key={search.id} to={`/dashboard/history`}>
-                        <Card className="cursor-pointer hover:shadow-lg transition-shadow h-full">
-                          <CardHeader>
+                  <Card className="cursor-pointer hover:shadow-lg transition-shadow h-full">
+                    <CardHeader>
                             <CardTitle className="text-lg line-clamp-1">
                               {search.domains?.[0] || search.sector || "Untitled"}
                             </CardTitle>
                             <CardDescription className="flex items-center gap-2 mt-2">
                               <Calendar className="h-4 w-4" />
                               {format(new Date(search.createdAt), "MMM dd, yyyy")}
-                            </CardDescription>
-                          </CardHeader>
+                      </CardDescription>
+                    </CardHeader>
                           <CardContent>
                             <div className="space-y-2">
                               <div className="text-sm">
@@ -184,8 +184,8 @@ const Dashboard = () => {
                               )}
                             </div>
                           </CardContent>
-                        </Card>
-                      </Link>
+                  </Card>
+                </Link>
                     ))}
                   </div>
                   <div className="flex justify-end">
@@ -196,7 +196,7 @@ const Dashboard = () => {
                       </Button>
                     </Link>
                   </div>
-                </div>
+              </div>
               )}
 
               {/* Empty State */}

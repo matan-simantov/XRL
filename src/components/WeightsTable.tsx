@@ -139,11 +139,11 @@ const parameters: Parameter[] = [
   // Financing (14 parameters - previously Israeli Funding / Financing)
   { short: "Non-VC Israeli Investors", full: "Number of Israeli investors who are not venture capital", category: "Israeli Funding / Financing" },
   { short: "Israeli VC Investors", full: "Number of Israeli venture capital investors", category: "Israeli Funding / Financing" },
-  { short: "Total Capital Raised Israel", full: "Total capital raised ($) (2019–2025)", category: "Israeli Funding / Financing" },
-  { short: "Capital: Seed Israel", full: "Total capital raised in Seed rounds ($) (2019–2025)", category: "Israeli Funding / Financing" },
-  { short: "Capital: Series A Israel", full: "Total capital raised in Series A rounds ($) (2019–2025)", category: "Israeli Funding / Financing" },
-  { short: "Capital: Series B–C Israel", full: "Total capital raised in Series B–C rounds ($) (2019–2025)", category: "Israeli Funding / Financing" },
-  { short: "Capital: Series D–J Israel", full: "Total capital raised in Series D–J rounds ($) (2019–2025)", category: "Israeli Funding / Financing" },
+  { short: "Total Capital Raised Israel", full: "Total capital raised ($) (2019–2025)", category: "Israeli Funding / Financing", format: "currency" },
+  { short: "Capital: Seed Israel", full: "Total capital raised in Seed rounds ($) (2019–2025)", category: "Israeli Funding / Financing", format: "currency" },
+  { short: "Capital: Series A Israel", full: "Total capital raised in Series A rounds ($) (2019–2025)", category: "Israeli Funding / Financing", format: "currency" },
+  { short: "Capital: Series B–C Israel", full: "Total capital raised in Series B–C rounds ($) (2019–2025)", category: "Israeli Funding / Financing", format: "currency" },
+  { short: "Capital: Series D–J Israel", full: "Total capital raised in Series D–J rounds ($) (2019–2025)", category: "Israeli Funding / Financing", format: "currency" },
   { short: "Foreign Investors", full: "Number of foreign investors", category: "Israeli Funding / Financing" },
   { short: "% Change Total Capital", full: "% change in total capital raised in the past 6 years (2019–2025 compared to 2014–2018)", category: "Israeli Funding / Financing" },
   { short: "% Change Seed Capital", full: "% change in total capital raised in Seed rounds in the past 6 years (2019–2025 compared to 2014–2018)", category: "Israeli Funding / Financing" },
@@ -399,23 +399,6 @@ export const WeightsTable = ({ llms = [], participants = [], domains = [], initi
       }
       return newSet;
     });
-  };
-  
-  const formatResultValue = (value: number, paramIndex: number): string => {
-    if (!Number.isFinite(value)) {
-      return "-";
-    }
-    const formatType = parameters[paramIndex]?.format;
-    switch (formatType) {
-      case "percentage":
-        return `${formatNumberWithOneDecimal(value * 100, true)}%`;
-      case "currency":
-        return `${formatNumberWithOneDecimal(value, true)} $`;
-      case "count":
-        return formatCount(value);
-      default:
-        return formatNumberWithOneDecimal(value);
-    }
   };
 
   const normalizeColumnWeights = (values: Array<number | null | undefined>): Array<number | null> => {
@@ -1109,7 +1092,7 @@ Best regards`);
       case "percentage":
         return `${formatNumberWithOneDecimal(value * 100, true)}%`;
       case "currency":
-        return `${formatNumberWithOneDecimal(value, true)} $`;
+        return `${formatCount(value)} $`;
       case "count":
         return formatCount(value);
       default:

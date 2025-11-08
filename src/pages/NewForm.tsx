@@ -118,15 +118,15 @@ const NewForm = () => {
       const loadDraft = urlParams.get('resume') === 'true';
       
       if (loadDraft) {
-        const latest = await (await import("@/lib/storage")).loadLatestDraft(username);
-        if (latest?.state) {
-          const parsed = latest.state;
-          if (parsed.domain && !parsed.domains) {
-            parsed.domains = [parsed.domain];
-            delete parsed.domain;
-          }
-          if (!parsed.domains) parsed.domains = [];
-          setState(parsed);
+      const latest = await (await import("@/lib/storage")).loadLatestDraft(username);
+      if (latest?.state) {
+        const parsed = latest.state;
+        if (parsed.domain && !parsed.domains) {
+          parsed.domains = [parsed.domain];
+          delete parsed.domain;
+        }
+        if (!parsed.domains) parsed.domains = [];
+        setState(parsed);
           // Update textarea values when draft is loaded
           setTextareaValues({
             goals: (parsed.goals || []).join("\n"),
@@ -134,7 +134,7 @@ const NewForm = () => {
             geography: (parsed.geography || []).join("\n"),
             compliance: (parsed.compliance || []).join("\n"),
           });
-          toast.success("Draft restored");
+        toast.success("Draft restored");
         }
       } else {
         // Always start with clean form, clear any existing draft
@@ -297,7 +297,7 @@ const NewForm = () => {
         .catch(error => {
           console.error("Failed to send domains to XRL_DataToPlatform webhook:", error)
         })
-    } else {
+        } else {
       console.warn("No domains to send to XRL DataToPlatform")
     }
 
@@ -308,29 +308,29 @@ const NewForm = () => {
     await new Promise(resolve => setTimeout(resolve, 3000));
 
     // Always continue as if successful
-    const username = getSession()?.username || "anonymous";
+      const username = getSession()?.username || "anonymous";
     const finalSheetUrl = "https://docs.google.com/spreadsheets/d/1E73HW28r-7ddclj22OGNUNvo194FlLHX2zX50XY5I3w/edit?usp=sharing";
     
     const savedRun = await commitRun(username, {
-      sector: state.sector,
-      domains: state.domains,
-      secondary_category: state.secondary_category,
-      goals: state.goals,
-      users: state.users,
-      geography: state.geography,
-      compliance: state.compliance,
-      time_horizon: state.time_horizon,
-      risk_posture: state.risk_posture,
-      llm: state.llm,
-      participants_count: state.participants_count,
-      participants: state.participants,
-      llm_weight_percent: state.llm_weight_percent,
+        sector: state.sector,
+        domains: state.domains,
+        secondary_category: state.secondary_category,
+        goals: state.goals,
+        users: state.users,
+        geography: state.geography,
+        compliance: state.compliance,
+        time_horizon: state.time_horizon,
+        risk_posture: state.risk_posture,
+        llm: state.llm,
+        participants_count: state.participants_count,
+        participants: state.participants,
+        llm_weight_percent: state.llm_weight_percent,
       sheetUrl: finalSheetUrl,
-    });
+      });
 
     setSheetUrl(finalSheetUrl);
-    setSubmitSuccess(true);
-    
+      setSubmitSuccess(true);
+      
     // Store the run ID for opening weights table from anywhere
     localStorage.setItem("xrl:lastSubmittedRunId", savedRun.id);
     
@@ -340,7 +340,7 @@ const NewForm = () => {
     // Don't show success toast - will show when results are ready via polling
     // Start polling for results
     setShouldPollResults(true);
-    
+
     setIsSubmitting(false);
   };
 
@@ -420,8 +420,8 @@ const NewForm = () => {
                     className={`domain-option ${isSelected ? 'selected' : ''} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                     onClick={() => !isDisabled && toggleDomain(domain)}
                   >
-                    <Checkbox 
-                      id={domain} 
+                  <Checkbox 
+                    id={domain} 
                       checked={isSelected} 
                       onCheckedChange={() => !isDisabled && toggleDomain(domain)} 
                       disabled={isDisabled}
@@ -433,7 +433,7 @@ const NewForm = () => {
                     >
                       {domain}
                     </Label>
-                  </div>
+                </div>
                 );
               })}
             </div>
@@ -757,9 +757,9 @@ const NewForm = () => {
                   <Slider
                     value={[state.llm_weight_percent]}
                     onValueChange={(value) => setState({ ...state, llm_weight_percent: value[0] })}
-                    min={0}
-                    max={100}
-                    step={25}
+                  min={0} 
+                  max={100} 
+                  step={25}
                     className="flex-1"
                   />
                   <div className="text-sm text-muted-foreground min-w-[80px] text-right">
@@ -784,8 +784,8 @@ const NewForm = () => {
                     <span className="text-xs font-medium text-muted-foreground">AI Models</span>
                   </div>
                   <p className="influence-value text-2xl">{state.llm_weight_percent}%</p>
-                </div>
-                <div className="influence-card">
+              </div>
+              <div className="influence-card">
                   <div className="flex items-center justify-center gap-2 mb-1">
                     <Users className="w-4 h-4 text-primary" />
                     <span className="text-xs font-medium text-muted-foreground">Human Experts</span>
@@ -947,20 +947,20 @@ const NewForm = () => {
                 <div>
                   <h3 className="text-xl font-semibold text-foreground mb-2">Success!</h3>
                   <p className="text-muted-foreground">Your submission has been completed</p>
-                </div>
+          </div>
                 
                 <div className="flex gap-3 justify-center pt-4">
-                  <Button 
-                    onClick={() => setShowWeightsTable(true)} 
+                <Button 
+                  onClick={() => setShowWeightsTable(true)} 
                     className={`${getButtonClasses()} transition-all duration-200 hover:shadow-lg`}
-                    size="lg"
-                  >
+                  size="lg"
+                >
                     View Weights Table
-                  </Button>
-                  <Button 
-                    variant="outline"
+                </Button>
+                <Button 
+                  variant="outline"
                     className="transition-all duration-200 hover:shadow-md"
-                    size="lg"
+                  size="lg"
                     onClick={() => {
                       // Clear any saved draft
                       localStorage.removeItem("xrl:intake:draft");
@@ -974,10 +974,10 @@ const NewForm = () => {
                     }}
                   >
                     New Form
-                  </Button>
-                </div>
+                </Button>
               </div>
-            )}
+            </div>
+          )}
           </div>
         </div>
 
@@ -989,8 +989,8 @@ const NewForm = () => {
               domains={state.domains}
               initialLlmWeight={state.llm_weight_percent}
               formData={state}
-              onClose={() => setShowWeightsTable(false)}
-            />
+            onClose={() => setShowWeightsTable(false)}
+          />
           </div>
         )}
       </div>
