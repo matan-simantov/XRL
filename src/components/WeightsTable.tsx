@@ -113,14 +113,14 @@ const parameters: Parameter[] = [
   { short: "Avg IPO Amount", full: "Average IPO amount ($) for companies that went public between 2020–2025", category: "Global Funding / Financing", format: "currency" },
   
   // Human Capital (5 parameters)
+  { short: "Employees in Sector", full: "Number of employees in the sector", category: "Human Capital", format: "count" },
   { short: "Incubators", full: "Number of incubators in the sector", category: "Human Capital" },
   { short: "Private Accelerators", full: "Number of private accelerators in the sector", category: "Human Capital" },
   { short: "Communities", full: "Number of communities in the sector", category: "Human Capital" },
-  { short: "Employees in Sector", full: "Number of employees in the sector", category: "Human Capital" },
   { short: "Training Programs", full: "Number of professional non-academic training programs and entrepreneurship support frameworks", category: "Human Capital" },
   
   // Companies / Firms (15 parameters)
-  { short: "Active Companies Israel", full: "Number of active companies in the sector in Israel", category: "Companies / Firms" },
+  { short: "Active Companies Israel", full: "Number of active companies in the sector in Israel", category: "Companies / Firms", format: "count" },
   { short: "New Companies Israel", full: "Number of new companies in the past 5 years (2019–2025)", category: "Companies / Firms" },
   { short: "Seed Rounds Israel", full: "Number of companies in the sector in Israel that raised Seed rounds (2020–2025)", category: "Companies / Firms" },
   { short: "Series A Israel", full: "Number of companies in the sector in Israel that raised a Series A round (2019–2025)", category: "Companies / Firms" },
@@ -1198,9 +1198,11 @@ Best regards`);
           data.matrix.forEach((row, paramIndex) => {
             const value = row[domainIndex];
             // Only update if value is not null/undefined/NaN
-            // This allows receiving data in multiple batches without overwriting existing data
             if (value !== null && value !== undefined && !Number.isNaN(value)) {
-              convertedData[domain][paramIndex] = value;
+              const actualParamIndex = RESULT_PARAMETER_INDEX_MAP[paramIndex] ?? paramIndex;
+              if (parameters[actualParamIndex]) {
+                convertedData[domain][actualParamIndex] = value;
+              }
             }
             // If value is null, keep existing data (don't overwrite)
           });
@@ -1259,9 +1261,11 @@ Best regards`);
           data.matrix.forEach((row, paramIndex) => {
             const value = row[domainIndex];
             // Only update if value is not null/undefined/NaN
-            // This allows receiving data in multiple batches without overwriting existing data
             if (value !== null && value !== undefined && !Number.isNaN(value)) {
-              convertedData[domain][paramIndex] = value;
+              const actualParamIndex = RESULT_PARAMETER_INDEX_MAP[paramIndex] ?? paramIndex;
+              if (parameters[actualParamIndex]) {
+                convertedData[domain][actualParamIndex] = value;
+              }
             }
             // If value is null, keep existing data (don't overwrite)
           });
@@ -1335,6 +1339,32 @@ Best regards`);
       </Card>
     );
   }
+
+  const employeesParamIndex = parameters.findIndex(p => p.short === "Employees in Sector")
+  const activeCompaniesIsraelIndex = parameters.findIndex(p => p.short === "Active Companies Israel")
+
+  const RESULT_PARAMETER_INDEX_MAP: Record<number, number> = {
+    ...(employeesParamIndex !== -1 ? { 14: employeesParamIndex } : {}),
+    ...(activeCompaniesIsraelIndex !== -1 ? { 15: activeCompaniesIsraelIndex } : {}),
+  }
+
+  const RESULT_PARAMETER_SOURCES: Record<number, string> = {}
+  ;[0,1,2,3,4,5,6,7,8,9,10,11,12,13].forEach((idx) => {
+    RESULT_PARAMETER_SOURCES[idx] = "Crunchbase"
+  })
+  if (employeesParamIndex !== -1) {
+    RESULT_PARAMETER_SOURCES[employeesParamIndex] = "IVC"
+  }
+  if (activeCompaniesIsraelIndex !== -1) {
+    RESULT_PARAMETER_SOURCES[activeCompaniesIsraelIndex] = "IVC"
+  }
+
+  const RESULTS_ACTIVE_PARAMETER_INDICES = [
+    0, 1, 2, 3, 4, 5, 6, 7, 8,
+    9, 10, 11, 12, 13,
+    ...(employeesParamIndex !== -1 ? [employeesParamIndex] : []),
+    ...(activeCompaniesIsraelIndex !== -1 ? [activeCompaniesIsraelIndex] : []),
+  ]
 
   return (
     <>
@@ -1699,16 +1729,33 @@ Best regards`);
                           <tr key={paramIndex} className="border-b border-border hover:bg-accent/50 transition-colors">
                             <td className="p-2 bg-background text-center whitespace-nowrap" style={{ width: 'auto', minWidth: '150px', maxWidth: '200px' }}>
                               <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="font-medium text-foreground cursor-help text-sm">
-                                      {param.short}
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="right" className="max-w-lg whitespace-normal">
-                                    <p className="break-words text-sm leading-relaxed">{param.full}</p>
-                                  </TooltipContent>
-                                </Tooltip>
+                                <div className="flex items-center justify-center gap-2">
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-5 w-5"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <HelpCircle className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left" className="text-xs">
+                                      <p className="font-medium">Source: {RESULT_PARAMETER_SOURCES[paramIndex] || "Unknown"}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="font-medium text-foreground cursor-help text-sm">
+                                        {param.short}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" className="max-w-lg whitespace-normal">
+                                      <p className="break-words text-sm leading-relaxed">{param.full}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
                               </TooltipProvider>
                             </td>
                             <td className={`p-1.5 ${isMeDisabled ? 'bg-muted/30' : ''}`} style={isMeDisabled ? {} : { backgroundColor: `var(--primary-ghost-hex)` }}>
@@ -1883,10 +1930,6 @@ Best regards`);
               );
             }
             
-            // Active parameters: 0-8 (Competition), 9-13 (Global Funding - n8n sends as 10-14)
-            // Note: n8n sends parameters 10-14, but we display them at indices 9-13
-            const activeParams = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
-            
             return (
               <div key="results-table" className="overflow-x-auto">
                 <table className="border-collapse mx-auto" style={{ width: '100%', maxWidth: '100%', tableLayout: 'auto' }}>
@@ -1906,7 +1949,7 @@ Best regards`);
                   {Object.keys(CATEGORIES).map((categoryName) => {
                     const category = categoryName as CategoryName;
                     const categoryParams = getParameterIndicesByCategory(category);
-                    const activeCategoryParams = categoryParams.filter(p => activeParams.includes(p))
+                    const activeCategoryParams = categoryParams.filter(p => RESULTS_ACTIVE_PARAMETER_INDICES.includes(p))
                     
                     return (
                       <Fragment key={category}>
