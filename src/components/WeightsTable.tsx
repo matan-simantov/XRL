@@ -1741,44 +1741,49 @@ Best regards`);
                                     </TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-5 w-5 text-muted-foreground flex-shrink-0"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        <HelpCircle className="h-4 w-4" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="left" className="text-xs">
-                                      <p className="font-medium">Source: {RESULT_PARAMETER_SOURCES[paramIndex] || "Unknown"}</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
                               </div>
                             </td>
-                            {domains.map((domain, domainIdx) => {
-                              const value = resultData[domain]?.[paramIndex];
+                            <td className={`text-center p-1.5 ${isMeDisabled ? 'bg-muted/30' : ''}`} style={isMeDisabled ? {} : { backgroundColor: `var(--primary-ghost-hex)` }}>
+                              <div className="flex justify-center">
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="0.1"
+                                  value={userWeights[currentDomain]?.[paramIndex]?.toFixed(1) ?? "0.0"}
+                                  onChange={(e) => handleUserWeightChange(paramIndex, e.target.value)}
+                                  className="w-18 h-7 text-center text-xs"
+                                  style={isMeDisabled ? {} : { borderColor: `var(--primary-hex)` }}
+                                  disabled={isMeDisabled}
+                                />
+                              </div>
+                            </td>
+                            {llms.map((llm, llmIdx) => {
+                              const isDisabled = disabledLlms.has(llm);
                               return (
-                                <td key={domainIdx} className="text-center p-2 text-foreground text-sm font-semibold bg-green-50 dark:bg-green-950/30 align-top" style={{ maxWidth: '200px' }}>
-                                  {(() => {
-                                    if (value === undefined || value === null) return "-";
-                                    
-                                    const num = Number(value);
-                                    if (Number.isNaN(num)) return "-";
-                                    
-                                    return (
-                                      <span className="block whitespace-normal break-words leading-snug">
-                                        {formatResultValue(num, paramIndex)}
-                                      </span>
-                                    );
-                                  })()}
+                                <td key={llmIdx} className={`text-center p-1.5 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : 'text-foreground'}`}>
+                                  {data[paramIndex][llm]?.toFixed(1) ?? "-"}
                                 </td>
                               );
                             })}
+                            {participants.map((participant, partIdx) => {
+                              const isDisabled = disabledParticipants.has(participant.name);
+                              const value = data[paramIndex][participant.name];
+                              return (
+                                <td key={`participant-param-${partIdx}`} className={`text-center p-1.5 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : ''}`}>
+                                  {value !== null ? (
+                                    <span className={`font-semibold ${isDisabled ? 'text-muted-foreground' : 'text-foreground'}`}>
+                                      {value.toFixed(1)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground">-</span>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            <td className="text-center p-1.5 text-foreground text-sm font-semibold bg-primary/10">
+                              {calculateFinalWeight(paramIndex).toFixed(1)}
+                            </td>
                           </tr>
                         );
                       })}
@@ -1984,18 +1989,37 @@ Best regards`);
                           return (
                             <tr key={paramIndex} className="border-b border-border hover:bg-accent/50 transition-colors">
                               <td className="p-2 bg-background text-center whitespace-nowrap" style={{ width: 'auto', minWidth: '150px', maxWidth: '200px' }}>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className="font-medium text-foreground cursor-help text-sm">
-                                        {param.short}
-                                      </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="right" className="max-w-lg whitespace-normal">
-                                      <p className="break-words text-sm leading-relaxed">{param.full}</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
+                                <div className="flex items-center justify-center gap-2">
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="font-medium text-foreground cursor-help text-sm">
+                                          {param.short}
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="right" className="max-w-lg whitespace-normal">
+                                        <p className="break-words text-sm leading-relaxed">{param.full}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-5 w-5 text-muted-foreground flex-shrink-0"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <HelpCircle className="h-4 w-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="left" className="text-xs">
+                                        <p className="font-medium">Source: {RESULT_PARAMETER_SOURCES[paramIndex] || "Unknown"}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </div>
                               </td>
                               {domains.map((domain, domainIdx) => {
                                 const value = resultData[domain]?.[paramIndex];
