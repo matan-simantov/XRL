@@ -71,6 +71,16 @@ const NewForm = () => {
   const navigate = useNavigate();
   const { getButtonClasses, getTextClass, getBgLightClass } = useButtonColor();
 
+  // 5s delay after successful submit before showing action screen
+  const [postSubmitDelayDone, setPostSubmitDelayDone] = useState(false)
+  useEffect(() => {
+    if (submitSuccess) {
+      setPostSubmitDelayDone(false)
+      const t = setTimeout(() => setPostSubmitDelayDone(true), 5000)
+      return () => clearTimeout(t)
+    }
+  }, [submitSuccess])
+
   // Polling for results from n8n
   useResultsPolling({
     enabled: shouldPollResults,
@@ -426,7 +436,7 @@ const NewForm = () => {
                       onCheckedChange={() => !isDisabled && toggleDomain(domain)} 
                       disabled={isDisabled}
                       className="pointer-events-none"
-                    />
+                  />
                     <Label 
                       htmlFor={domain} 
                       className="text-[#111111] font-normal cursor-pointer flex-1 ml-2 pointer-events-none"
@@ -928,16 +938,16 @@ const NewForm = () => {
       <div className="max-w-[95vw] mx-auto">
         <div className="step-card">
           <div className="step-title text-[#111111]">
-            {isSubmitting ? "Processing Submission..." : "Submission Complete"}
+            {isSubmitting ? "Processing Submission..." : (postSubmitDelayDone ? "Submission Complete" : "Finalizing...")}
           </div>
           <div className="helper">
-            {isSubmitting ? "Please wait while we process your data" : "Your submission has been processed successfully"}
+            {isSubmitting ? "Please wait while we process your data" : (postSubmitDelayDone ? "Your submission has been processed successfully" : "Preparing your actions...")}
           </div>
           <div className="card-body flex items-center justify-center min-h-[300px]">
-            {isSubmitting ? (
+            {(isSubmitting || !postSubmitDelayDone) ? (
               <div className="text-center space-y-4">
                 <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto"></div>
-                <p className="text-muted-foreground">Processing your submission...</p>
+                <p className="text-muted-foreground">Loading, please wait…</p>
               </div>
             ) : (
               <div className="text-center space-y-6 w-full">
@@ -972,7 +982,7 @@ const NewForm = () => {
                       setShowWeightsTable(false);
                       setSheetUrl(null);
                     }}
-                  >
+                >
                     New Form
                 </Button>
               </div>
@@ -981,7 +991,7 @@ const NewForm = () => {
           </div>
         </div>
 
-        {showWeightsTable && submitSuccess && (
+        {showWeightsTable && submitSuccess && postSubmitDelayDone && (
           <div data-weights-table>
             <WeightsTable
               llms={state.llm}

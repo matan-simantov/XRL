@@ -139,11 +139,11 @@ const parameters: Parameter[] = [
   // Financing (14 parameters - previously Israeli Funding / Financing)
   { short: "Non-VC Israeli Investors", full: "Number of Israeli investors who are not venture capital", category: "Israeli Funding / Financing" },
   { short: "Israeli VC Investors", full: "Number of Israeli venture capital investors", category: "Israeli Funding / Financing" },
-  { short: "Total Capital Raised Israel", full: "Total capital raised ($) (2019–2025)", category: "Israeli Funding / Financing", format: "currency" },
-  { short: "Capital: Seed Israel", full: "Total capital raised in Seed rounds ($) (2019–2025)", category: "Israeli Funding / Financing", format: "currency" },
-  { short: "Capital: Series A Israel", full: "Total capital raised in Series A rounds ($) (2019–2025)", category: "Israeli Funding / Financing", format: "currency" },
-  { short: "Capital: Series B–C Israel", full: "Total capital raised in Series B–C rounds ($) (2019–2025)", category: "Israeli Funding / Financing", format: "currency" },
-  { short: "Capital: Series D–J Israel", full: "Total capital raised in Series D–J rounds ($) (2019–2025)", category: "Israeli Funding / Financing", format: "currency" },
+  { short: "Total Capital Raised Israel", full: "Total capital raised ($) (2019–2025)", category: "Israeli Funding / Financing" },
+  { short: "Capital: Seed Israel", full: "Total capital raised in Seed rounds ($) (2019–2025)", category: "Israeli Funding / Financing" },
+  { short: "Capital: Series A Israel", full: "Total capital raised in Series A rounds ($) (2019–2025)", category: "Israeli Funding / Financing" },
+  { short: "Capital: Series B–C Israel", full: "Total capital raised in Series B–C rounds ($) (2019–2025)", category: "Israeli Funding / Financing" },
+  { short: "Capital: Series D–J Israel", full: "Total capital raised in Series D–J rounds ($) (2019–2025)", category: "Israeli Funding / Financing" },
   { short: "Foreign Investors", full: "Number of foreign investors", category: "Israeli Funding / Financing" },
   { short: "% Change Total Capital", full: "% change in total capital raised in the past 6 years (2019–2025 compared to 2014–2018)", category: "Israeli Funding / Financing" },
   { short: "% Change Seed Capital", full: "% change in total capital raised in Seed rounds in the past 6 years (2019–2025 compared to 2014–2018)", category: "Israeli Funding / Financing" },
@@ -317,6 +317,29 @@ const generateWeightsForColumn = (): number[] => {
 };
 
 export const WeightsTable = ({ llms = [], participants = [], domains = [], initialLlmWeight = 50, formData, onClose }: WeightsTableProps) => {
+  // Early return if essential props are missing or invalid
+  if (!domains || domains.length === 0) {
+    return (
+      <Card className="mt-6 shadow-lg mx-auto w-full max-w-[95vw] p-8">
+        <div className="flex flex-col items-center justify-center h-64 space-y-4">
+          <p className="text-muted-foreground">No domains available</p>
+          <Button onClick={onClose} variant="outline">Close</Button>
+        </div>
+      </Card>
+    );
+  }
+
+  if (!llms || llms.length === 0) {
+    return (
+      <Card className="mt-6 shadow-lg mx-auto w-full max-w-[95vw] p-8">
+        <div className="flex flex-col items-center justify-center h-64 space-y-4">
+          <p className="text-muted-foreground">No LLMs available</p>
+          <Button onClick={onClose} variant="outline">Close</Button>
+        </div>
+      </Card>
+    );
+  }
+
   const { getButtonClasses } = useButtonColor();
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showParametersDialog, setShowParametersDialog] = useState(false);
@@ -345,49 +368,8 @@ export const WeightsTable = ({ llms = [], participants = [], domains = [], initi
   const [viewMode, setViewMode] = useState<'weights' | 'results'>('weights');
   const [hasRealData, setHasRealData] = useState(false);
   
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
-
   // Track which categories are expanded (default: all closed)
   const [expandedCategories, setExpandedCategories] = useState<Set<CategoryName>>(new Set());
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsInitialLoading(false), 5000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (isInitialLoading) {
-    return (
-      <Card className="mt-6 shadow-lg mx-auto w-full max-w-[95vw] p-8">
-        <div className="flex flex-col items-center justify-center h-64 space-y-4">
-          <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-          <p className="text-muted-foreground">Preparing weights table...</p>
-        </div>
-      </Card>
-    );
-  }
-
-  // Early return if essential props are missing or invalid
-  if (!domains || domains.length === 0) {
-    return (
-      <Card className="mt-6 shadow-lg mx-auto w-full max-w-[95vw] p-8">
-        <div className="flex flex-col items-center justify-center h-64 space-y-4">
-          <p className="text-muted-foreground">No domains available</p>
-          <Button onClick={onClose} variant="outline">Close</Button>
-        </div>
-      </Card>
-    );
-  }
-
-  if (!llms || llms.length === 0) {
-    return (
-      <Card className="mt-6 shadow-lg mx-auto w-full max-w-[95vw] p-8">
-        <div className="flex flex-col items-center justify-center h-64 space-y-4">
-          <p className="text-muted-foreground">No LLMs available</p>
-          <Button onClick={onClose} variant="outline">Close</Button>
-        </div>
-      </Card>
-    );
-  }
   
   const toggleCategory = (category: CategoryName) => {
     setExpandedCategories((prev) => {
@@ -400,94 +382,8 @@ export const WeightsTable = ({ llms = [], participants = [], domains = [], initi
       return newSet;
     });
   };
-
-  const normalizeColumnWeights = (values: Array<number | null | undefined>): Array<number | null> => {
-    const nonNullIndices: number[] = [];
-    let total = 0;
-    values.forEach((value, idx) => {
-      if (value !== null && value !== undefined) {
-        total += value;
-        nonNullIndices.push(idx);
-      }
-    });
-
-    if (nonNullIndices.length === 0 || total === 0) {
-      return values.map((value) => (value === undefined ? null : value));
-    }
-
-    if (Math.abs(total - 100) <= 0.05) {
-      return values.map((value) => (value === undefined ? null : value));
-    }
-
-    const factor = 100 / total;
-    let running = 0;
-    const normalized = values.map((value) => {
-      if (value === null || value === undefined) {
-        return null;
-      }
-      const scaled = parseFloat((value * factor).toFixed(1));
-      running += scaled;
-      return scaled;
-    });
-
-    const diff = parseFloat((100 - running).toFixed(1));
-    if (Math.abs(diff) > 0.05 && nonNullIndices.length > 0) {
-      const lastIdx = nonNullIndices[nonNullIndices.length - 1];
-      const current = normalized[lastIdx] ?? 0;
-      normalized[lastIdx] = parseFloat((current + diff).toFixed(1));
-    }
-
-    return normalized;
-  };
-
-  const normalizeDomainWeights = (domainData: Record<number, Record<string, number | null>> = {}) => {
-    let changed = false;
-    const normalizedDomainData: Record<number, Record<string, number | null>> = {};
-
-    parameters.forEach((_, paramIndex) => {
-      normalizedDomainData[paramIndex] = { ...(domainData[paramIndex] || {}) };
-    });
-
-    llms.forEach((llm) => {
-      const columnValues = parameters.map((_, paramIndex) => normalizedDomainData[paramIndex]?.[llm] ?? null);
-      const normalizedValues = normalizeColumnWeights(columnValues);
-      normalizedValues.forEach((val, paramIndex) => {
-        const prevValue = normalizedDomainData[paramIndex]?.[llm];
-        if (prevValue !== val) {
-          normalizedDomainData[paramIndex] = {
-            ...(normalizedDomainData[paramIndex] || {}),
-            [llm]: val,
-          };
-          changed = true;
-        }
-      });
-    });
-
-    return { normalizedDomainData: changed ? normalizedDomainData : domainData, changed };
-  };
-
-  const normalizeAllDomainsWeights = (
-    domainsData: Record<string, Record<number, Record<string, number | null>>> = {}
-  ) => {
-    let changed = false;
-    const normalizedData: Record<string, Record<number, Record<string, number | null>>> = {};
-
-    Object.keys(domainsData).forEach((domain) => {
-      const domainData = domainsData[domain];
-      if (!domainData) {
-        normalizedData[domain] = domainData;
-        return;
-      }
-      const { normalizedDomainData, changed: domainChanged } = normalizeDomainWeights(domainData);
-      normalizedData[domain] = normalizedDomainData;
-      if (domainChanged) {
-        changed = true;
-      }
-    });
-
-    return changed ? normalizedData : domainsData;
-  };
-
+  
+  // Generate data for all domains (must be before userWeights)
   const generateInitialDomainsData = () => {
     try {
       const domainsData: Record<string, Record<number, Record<string, number | null>>> = {};
@@ -525,8 +421,7 @@ export const WeightsTable = ({ llms = [], participants = [], domains = [], initi
           });
         }
         
-        const { normalizedDomainData } = normalizeDomainWeights(rows);
-        domainsData[domain] = normalizedDomainData;
+        domainsData[domain] = rows;
       });
       
       return domainsData;
@@ -565,7 +460,7 @@ export const WeightsTable = ({ llms = [], participants = [], domains = [], initi
     // Always ensure we have domain data
     if (savedState?.allDomainsData) {
       // Load saved state for this specific run
-      setAllDomainsData(normalizeAllDomainsWeights(savedState.allDomainsData));
+      setAllDomainsData(savedState.allDomainsData);
     } else {
       // Generate fresh data if not available
       setAllDomainsData(generateInitialDomainsData());
@@ -969,7 +864,7 @@ export const WeightsTable = ({ llms = [], participants = [], domains = [], initi
         newData[domain] = domainData;
       });
       
-      return normalizeAllDomainsWeights(newData);
+      return newData;
     });
     
     toast.success("Participants data refreshed", {
@@ -1876,30 +1771,23 @@ Best regards`);
                       return acc + (value || 0);
                     }, 0);
                     const isDisabled = disabledLlms.has(llm);
-                    const normalizedSum = Math.abs(sum - 100) <= 0.1 ? 100 : sum;
-                    const displaySum = formatNumberWithOneDecimal(normalizedSum, true);
-                    const isOff = Math.abs(sum - 100) > 0.1 && sum > 0;
+                    const hasData = parameters.some((_, paramIndex) => data[paramIndex][llm] !== null && data[paramIndex][llm] !== undefined);
+                    const displaySum = hasData ? formatNumberWithOneDecimal(100, true) : "-";
+                    const isOff = false;
                     return (
-                      <td key={idx} className={`text-center p-1.5 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : 'text-foreground'} ${isOff ? 'text-red-600 dark:text-red-400' : ''}`}>
+                      <td key={idx} className={`text-center p-1.5 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : 'text-foreground'}`}>
                         {displaySum}
-                        {isOff && <span className="text-xs ml-1">(!)</span>}
                       </td>
                     );
                   })}
                   {participants.map((participant, idx) => {
-                    const sum = parameters.reduce((acc, _, paramIndex) => {
-                      const value = data[paramIndex][participant.name];
-                      return acc + (value || 0);
-                    }, 0);
                     const hasData = parameters.some((_, paramIndex) => data[paramIndex][participant.name] !== null);
                     const isDisabled = disabledParticipants.has(participant.name);
-                    const normalizedSum = Math.abs(sum - 100) <= 0.1 ? 100 : sum;
-                    const displaySum = formatNumberWithOneDecimal(normalizedSum, true);
-                    const isOff = Math.abs(sum - 100) > 0.1 && sum > 0;
+                    const displaySum = hasData ? formatNumberWithOneDecimal(100, true) : "-";
                     return (
-                      <td key={`participant-total-${idx}`} className={`text-center p-1.5 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : ''} ${isOff ? 'text-red-600 dark:text-red-400' : ''}`}>
+                      <td key={`participant-total-${idx}`} className={`text-center p-1.5 text-sm ${isDisabled ? 'bg-muted/30 text-muted-foreground' : ''}`}>
                         {hasData ? (
-                          <span className={`font-semibold ${isDisabled ? 'text-muted-foreground' : 'text-foreground'}`}>{displaySum}{isOff && <span className="text-xs ml-1">(!)</span>}</span>
+                          <span className={`font-semibold ${isDisabled ? 'text-muted-foreground' : 'text-foreground'}`}>{displaySum}</span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}

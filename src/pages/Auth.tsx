@@ -56,7 +56,7 @@ const Auth = () => {
     });
     // Use setTimeout to ensure session is set before navigation
     setTimeout(() => {
-      navigate("/dashboard", { replace: true });
+    navigate("/dashboard", { replace: true });
     }, 100);
     setIsSubmitting(false);
   };
@@ -85,7 +85,7 @@ const Auth = () => {
       });
       // Use setTimeout to ensure session is set before navigation
       setTimeout(() => {
-        navigate("/dashboard", { replace: true });
+      navigate("/dashboard", { replace: true });
       }, 100);
     } catch (e: any) {
       if (e?.message === "USERNAME_TAKEN") {
