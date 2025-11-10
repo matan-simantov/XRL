@@ -147,6 +147,85 @@ const resultsCache = new Map()
 let latestNormalized = null
 let latestCompanyLists = null
 
+const mergeCompanyListsPayload = payload => {
+  if (!payload) return
+
+  const items = Array.isArray(payload) ? payload : [payload]
+
+  if (!latestCompanyLists) latestCompanyLists = []
+
+  items.forEach(item => {
+    if (!item || typeof item !== "object") return
+
+    const baseParam =
+      item.parameter !== undefined && item.parameter !== null
+        ? Number(item.parameter)
+        : null
+
+    const domainKeys = Array.isArray(item.domain_keys)
+      ? item.domain_keys.map(k =>
+          k === null || k === undefined ? null : Number(k)
+        )
+      : null
+
+    const lists = Array.isArray(item.companyLists) ? item.companyLists : [item]
+
+    lists.forEach(list => {
+      if (!list || typeof list !== "object") return
+
+      const companies = Array.isArray(list.companies)
+        ? list.companies.filter(
+            c => typeof c === "string" && c.trim().length > 0
+          )
+        : []
+      if (companies.length === 0) return
+
+      const paramNumber =
+        list.parameter !== undefined && list.parameter !== null
+          ? Number(list.parameter)
+          : baseParam
+      if (!Number.isFinite(paramNumber)) return
+
+      const indexRaw =
+        list.index ??
+        list.domainIndex ??
+        list.domain_key ??
+        list.domainKey
+      const domainIndex = Number(indexRaw)
+      if (!Number.isFinite(domainIndex) || domainIndex <= 0) return
+
+      const domainKey =
+        domainKeys && domainKeys[domainIndex - 1] !== undefined
+          ? domainKeys[domainIndex - 1]
+          : null
+
+      const entry = {
+        parameter: paramNumber,
+        index: domainIndex,
+        domainKey,
+        companies
+      }
+
+      if (typeof list.domain === "string") {
+        entry.domain = list.domain
+      }
+
+      const existingIndex = latestCompanyLists.findIndex(
+        stored =>
+          stored.parameter === entry.parameter && stored.index === entry.index
+      )
+
+      if (existingIndex !== -1) {
+        latestCompanyLists[existingIndex] = entry
+      } else {
+        latestCompanyLists.push(entry)
+      }
+    })
+  })
+
+  console.log("Total company lists stored:", latestCompanyLists.length)
+}
+
 // Helper for debugging
 app.get("/api/debug/routes", (_, res) => {
   res.json({ routes: ["/api/health", "/api/n8n/callback", "/api/results/latest", "/api/debug/routes"] })
@@ -364,24 +443,11 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
   }
   // פורמט 4: נשלחו רק companyLists (כמערך של אובייקטים עם { parameter, companyLists })
   else if (
-    (Array.isArray(body) && body.length > 0 && body[0] && body[0].companyLists) ||
+    (Array.isArray(body) && body.length > 0 && body[0] && (body[0].companyLists || Array.isArray(body[0].companies))) ||
     (!Array.isArray(body) && body && Array.isArray(body.companyLists))
   ) {
     console.log("Detected companyLists-only payload, merging lists")
-    if (!latestCompanyLists) latestCompanyLists = []
-    const items = Array.isArray(body) ? body : [body]
-    items.forEach(item => {
-      const param = Number(item.parameter)
-      const lists = item.companyLists
-      if (!Array.isArray(lists) || Number.isNaN(param)) return
-      lists.forEach(list => {
-        const entry = { parameter: param, ...list }
-        const idx = latestCompanyLists.findIndex(e => e.parameter === entry.parameter && e.index === entry.index)
-        if (idx !== -1) latestCompanyLists[idx] = entry
-        else latestCompanyLists.push(entry)
-      })
-    })
-    console.log("Company lists merged, count:", latestCompanyLists.length)
+    mergeCompanyListsPayload(body)
     return res.json({ ok: true, receivedCompanyLists: latestCompanyLists.length })
   }
   else {
@@ -460,31 +526,11 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
   // Process company lists if present
   if (body.companyLists && Array.isArray(body.companyLists)) {
     console.log("Processing company lists:", body.companyLists.length, "items")
-    
-    // Merge with existing company lists instead of replacing
-    if (!latestCompanyLists) {
-      latestCompanyLists = []
-    }
-    
-    // Add new company lists, avoiding duplicates
-    body.companyLists.forEach(newItem => {
-      const param = Number(newItem.parameter ?? body.parameter)
-      if (Number.isNaN(param)) return
-      const entry = { ...newItem, parameter: param }
-      const existingIndex = latestCompanyLists.findIndex(
-        item => item.parameter === entry.parameter && item.index === entry.index
-      )
-      
-      if (existingIndex !== -1) {
-        // Update existing entry
-        latestCompanyLists[existingIndex] = entry
-      } else {
-        // Add new entry
-        latestCompanyLists.push(entry)
-      }
+    mergeCompanyListsPayload({
+      parameter: body.parameter,
+      domain_keys: body.domain_keys,
+      companyLists: body.companyLists
     })
-    
-    console.log("Total company lists stored:", latestCompanyLists.length)
   }
 
   console.log("Data saved successfully")

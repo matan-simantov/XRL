@@ -1279,54 +1279,96 @@ Best regards`);
   };
 
   const processCompanyLists = (companyListsData: any) => {
-    // Expected format: array of { parameter?, index, domain, companies }
-    // If 'parameter' is not provided, we'll try to infer from context
-    if (!Array.isArray(companyListsData)) return;
-    
-    const newCompanyLists: Record<number, Record<string, string[]>> = {};
-    
-    companyListsData.forEach((item: any) => {
-      if (!item || typeof item !== 'object') return;
-      
-      const { parameter, index, domain, companies } = item;
-      
-      // Determine the parameter index
-      let paramIndex: number;
-      
-      if (parameter !== undefined && parameter !== null) {
-        // If 'parameter' field exists, use it
-        paramIndex = typeof parameter === 'string' ? parseInt(parameter) : parameter;
-      } else {
-        // Fallback: 'index' might be the parameter number in old format
-        paramIndex = typeof index === 'string' ? parseInt(index) : index;
-      }
-      
-      if (typeof paramIndex !== 'number' || isNaN(paramIndex) || typeof domain !== 'string' || !Array.isArray(companies)) return;
-      
-      // Map domain name to actual domain from props
-      const actualDomain = domains.find(d => d.toLowerCase() === domain.toLowerCase()) || domain;
-      
-      if (!newCompanyLists[paramIndex]) {
-        newCompanyLists[paramIndex] = {};
-      }
-      
-      newCompanyLists[paramIndex][actualDomain] = companies.filter(c => typeof c === 'string' && c.trim().length > 0);
-    });
-    
-    setCompanyLists(prev => {
-      const merged = { ...prev };
-      Object.entries(newCompanyLists).forEach(([paramIndexStr, domainMap]) => {
-        const paramIndex = parseInt(paramIndexStr);
-        if (!merged[paramIndex]) {
-          merged[paramIndex] = {};
+    const entries = Array.isArray(companyListsData)
+      ? companyListsData
+      : companyListsData && Array.isArray(companyListsData.companyLists)
+        ? companyListsData.companyLists.map((list: any) => ({
+            ...list,
+            parameter: companyListsData.parameter,
+            domain_keys: companyListsData.domain_keys
+          }))
+        : []
+
+    if (entries.length === 0) return
+
+    const newCompanyLists: Record<number, Record<string, string[]>> = {}
+
+    entries.forEach((item: any) => {
+      if (!item || typeof item !== "object") return
+
+      const paramNumberRaw = item.parameter ?? item.param
+      const paramNumber =
+        typeof paramNumberRaw === "string"
+          ? parseInt(paramNumberRaw)
+          : Number(paramNumberRaw)
+      if (!Number.isFinite(paramNumber)) return
+
+      const matrixIndex = paramNumber - 1
+      if (!Number.isFinite(matrixIndex) || matrixIndex < 0) return
+
+      const actualParamIndex =
+        RESULT_PARAMETER_INDEX_MAP[matrixIndex] ?? matrixIndex
+      if (!parameters[actualParamIndex]) return
+
+      const rawCompanies = Array.isArray(item.companies) ? item.companies : []
+      const cleanedCompanies = rawCompanies.filter(
+        (company: any) => typeof company === "string" && company.trim().length > 0
+      )
+      if (cleanedCompanies.length === 0) return
+
+      const domainIndexRaw =
+        item.domain ??
+        item.index ??
+        item.domainIndex ??
+        item.domain_key ??
+        item.domainKey
+
+      let domainName = ""
+
+      if (typeof domainIndexRaw === "string" && domains.length > 0) {
+        const domainIndex = parseInt(domainIndexRaw)
+        if (Number.isFinite(domainIndex) && domainIndex > 0) {
+          domainName = domains[domainIndex - 1] || `Domain ${domainIndex}`
+        } else {
+          domainName = domainIndexRaw
         }
-        Object.entries(domainMap).forEach(([domain, companies]) => {
-          merged[paramIndex][domain] = companies;
-        });
-      });
-      return merged;
-    });
-  };
+      } else if (typeof domainIndexRaw === "number") {
+        if (Number.isFinite(domainIndexRaw) && domainIndexRaw > 0) {
+          domainName =
+            domains[domainIndexRaw - 1] || `Domain ${domainIndexRaw}`
+        }
+      }
+
+      if (!domainName && typeof item.domain === "string") {
+        domainName = item.domain
+      }
+
+      if (!domainName) return
+
+      if (!newCompanyLists[actualParamIndex]) {
+        newCompanyLists[actualParamIndex] = {}
+      }
+
+      newCompanyLists[actualParamIndex][domainName] = cleanedCompanies
+    })
+
+    if (Object.keys(newCompanyLists).length === 0) return
+
+    setCompanyLists(prev => {
+      const merged = { ...prev }
+      Object.entries(newCompanyLists).forEach(([paramIndexStr, domainMap]) => {
+        const paramIndex = Number(paramIndexStr)
+        if (!Number.isFinite(paramIndex)) return
+        if (!merged[paramIndex]) {
+          merged[paramIndex] = {}
+        }
+        Object.entries(domainMap).forEach(([domainName, companies]) => {
+          merged[paramIndex][domainName] = companies
+        })
+      })
+      return merged
+    })
+  }
   
   const handleOpenCompanyList = (paramIndex: number, domain: string) => {
     const companies = companyLists[paramIndex]?.[domain] || [];
