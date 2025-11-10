@@ -1639,6 +1639,10 @@ Best regards`);
       }
 
       RESULTS_ACTIVE_PARAMETER_INDICES.forEach((paramIndex) => {
+        // אל תייצר ערך דמה לפרמטר Employees in Sector (יש להציג רק מה שמגיע מ-n8n)
+        if (paramIndex === EMPLOYEES_PARAM_INDEX) {
+          return;
+        }
         const currentValue = values[paramIndex];
         const numericValue = typeof currentValue === "number" ? currentValue : Number(currentValue);
         if (Number.isFinite(numericValue) && numericValue > 0) {
