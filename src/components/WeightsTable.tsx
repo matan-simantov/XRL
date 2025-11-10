@@ -1028,6 +1028,15 @@ Best regards`);
     }
   };
 
+  // Helper function to round to 100.0 if very close
+  const roundToHundredIfClose = (value: number): number => {
+    // If within 0.15 of 100, round to 100.0
+    if (Math.abs(value - 100) <= 0.15) {
+      return 100.0;
+    }
+    return value;
+  };
+
   // Calculate final weight for a parameter row
   const calculateFinalWeight = (paramIndex: number): number => {
     // Calculate average LLM weight (only enabled LLMs)
@@ -2045,7 +2054,7 @@ Best regards`);
                           );
                         })}
                         <td className="text-center p-1.5 text-foreground text-sm font-semibold bg-primary/5">
-                          {categoryParams.reduce((sum, paramIndex) => sum + calculateFinalWeight(paramIndex), 0).toFixed(1)}
+                          {roundToHundredIfClose(categoryParams.reduce((sum, paramIndex) => sum + calculateFinalWeight(paramIndex), 0)).toFixed(1)}
                         </td>
                       </tr>
                       {/* Parameters in this category - only show if expanded */}
@@ -2162,7 +2171,7 @@ Best regards`);
                     );
                   })}
                   <td className="text-center p-1.5 text-foreground text-sm font-semibold bg-primary/10">
-                    {formatNumberWithOneDecimal(parameters.reduce((sum, _, paramIndex) => sum + calculateFinalWeight(paramIndex), 0), true)}
+                    {formatNumberWithOneDecimal(roundToHundredIfClose(parameters.reduce((sum, _, paramIndex) => sum + calculateFinalWeight(paramIndex), 0)), true)}
                   </td>
                 </tr>
               </tbody>
