@@ -523,13 +523,23 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
     }
   }
 
-  // Process company lists if present
+  // Process company lists if present (both old and new format)
   if (body.companyLists && Array.isArray(body.companyLists)) {
-    console.log("Processing company lists:", body.companyLists.length, "items")
+    console.log("Processing company lists (old format):", body.companyLists.length, "items")
     mergeCompanyListsPayload({
       parameter: body.parameter,
       domain_keys: body.domain_keys,
       companyLists: body.companyLists
+    })
+  }
+  
+  // Process company_entries (new format)
+  if (body.company_entries && Array.isArray(body.company_entries)) {
+    console.log("Processing company_entries (new format):", body.company_entries.length, "items")
+    mergeCompanyListsPayload({
+      parameter: body.parameter,
+      domain_keys: body.domain_keys,
+      companyLists: body.company_entries
     })
   }
 
