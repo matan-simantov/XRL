@@ -523,19 +523,41 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
     }
   }
 
-  // Process company lists if present (both old and new format)
-  if (body.companyLists && Array.isArray(body.companyLists)) {
-    console.log("Processing company lists (old format):", body.companyLists.length, "items")
-    mergeCompanyListsPayload({
-      parameter: body.parameter,
-      domain_keys: body.domain_keys,
-      companyLists: body.companyLists
-    })
+  // Process company lists if present (multiple formats)
+  if (body.companyLists) {
+    // New format: object with parameter keys (e.g., { "5": {...}, "6": {...} })
+    if (typeof body.companyLists === 'object' && !Array.isArray(body.companyLists)) {
+      console.log("Processing companyLists (object format with parameter keys)")
+      Object.entries(body.companyLists).forEach(([paramKey, paramData]) => {
+        if (!paramData || typeof paramData !== 'object') return
+        const param = Number(paramKey)
+        if (Number.isNaN(param)) return
+        
+        const lists = paramData.lists || []
+        if (!Array.isArray(lists)) return
+        
+        console.log(`Processing parameter ${param} with ${lists.length} domain lists`)
+        mergeCompanyListsPayload({
+          parameter: param,
+          domain_keys: paramData.domain_keys,
+          companyLists: lists
+        })
+      })
+    }
+    // Old format: array
+    else if (Array.isArray(body.companyLists)) {
+      console.log("Processing company lists (array format):", body.companyLists.length, "items")
+      mergeCompanyListsPayload({
+        parameter: body.parameter,
+        domain_keys: body.domain_keys,
+        companyLists: body.companyLists
+      })
+    }
   }
   
-  // Process company_entries (new format)
+  // Process company_entries (alternative format)
   if (body.company_entries && Array.isArray(body.company_entries)) {
-    console.log("Processing company_entries (new format):", body.company_entries.length, "items")
+    console.log("Processing company_entries (array format):", body.company_entries.length, "items")
     mergeCompanyListsPayload({
       parameter: body.parameter,
       domain_keys: body.domain_keys,
