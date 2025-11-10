@@ -160,17 +160,24 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
   if (process.env.N8N_CALLBACK_SECRET && secret !== process.env.N8N_CALLBACK_SECRET)
     return res.status(401).json({ error: "unauthorized" })
 
-  const body = req.body
+  let body = req.body
 
   // לוג של מה מתקבל בפועל לדייבוג
   console.log("=== n8n callback received ===")
   console.log("Headers:", JSON.stringify(req.headers, null, 2))
   console.log("Body type:", typeof body)
+  console.log("Is array:", Array.isArray(body))
   console.log("Body keys:", body ? Object.keys(body) : "null/undefined")
   console.log("Body sample:", JSON.stringify(body, null, 2).substring(0, 500))
 
+  // אם הגוף הוא מערך, קח את האובייקט הראשון
+  if (Array.isArray(body) && body.length > 0) {
+    console.log("Body is an array, extracting first element")
+    body = body[0]
+  }
+
   // בדיקה אם body ריק או לא תקין
-  if (!body || Object.keys(body).length === 0) {
+  if (!body || (typeof body === 'object' && Object.keys(body).length === 0)) {
     return res.status(400).json({ 
       error: "invalid_payload", 
       hint: "request body is empty or missing",
@@ -432,7 +439,28 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
   // Process company lists if present
   if (body.companyLists && Array.isArray(body.companyLists)) {
     console.log("Processing company lists:", body.companyLists.length, "items")
-    latestCompanyLists = body.companyLists
+    
+    // Merge with existing company lists instead of replacing
+    if (!latestCompanyLists) {
+      latestCompanyLists = []
+    }
+    
+    // Add new company lists, avoiding duplicates
+    body.companyLists.forEach(newItem => {
+      const existingIndex = latestCompanyLists.findIndex(
+        item => item.parameter === newItem.parameter && item.index === newItem.index
+      )
+      
+      if (existingIndex !== -1) {
+        // Update existing entry
+        latestCompanyLists[existingIndex] = newItem
+      } else {
+        // Add new entry
+        latestCompanyLists.push(newItem)
+      }
+    })
+    
+    console.log("Total company lists stored:", latestCompanyLists.length)
   }
 
   console.log("Data saved successfully")

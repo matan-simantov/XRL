@@ -1279,7 +1279,8 @@ Best regards`);
   };
 
   const processCompanyLists = (companyListsData: any) => {
-    // Expected format: array of { index, domain, companies }
+    // Expected format: array of { parameter?, index, domain, companies }
+    // If 'parameter' is not provided, we'll try to infer from context
     if (!Array.isArray(companyListsData)) return;
     
     const newCompanyLists: Record<number, Record<string, string[]>> = {};
@@ -1287,17 +1288,29 @@ Best regards`);
     companyListsData.forEach((item: any) => {
       if (!item || typeof item !== 'object') return;
       
-      const { index, domain, companies } = item;
-      if (typeof index !== 'number' || typeof domain !== 'string' || !Array.isArray(companies)) return;
+      const { parameter, index, domain, companies } = item;
+      
+      // Determine the parameter index
+      let paramIndex: number;
+      
+      if (parameter !== undefined && parameter !== null) {
+        // If 'parameter' field exists, use it
+        paramIndex = typeof parameter === 'string' ? parseInt(parameter) : parameter;
+      } else {
+        // Fallback: 'index' might be the parameter number in old format
+        paramIndex = typeof index === 'string' ? parseInt(index) : index;
+      }
+      
+      if (typeof paramIndex !== 'number' || isNaN(paramIndex) || typeof domain !== 'string' || !Array.isArray(companies)) return;
       
       // Map domain name to actual domain from props
       const actualDomain = domains.find(d => d.toLowerCase() === domain.toLowerCase()) || domain;
       
-      if (!newCompanyLists[index]) {
-        newCompanyLists[index] = {};
+      if (!newCompanyLists[paramIndex]) {
+        newCompanyLists[paramIndex] = {};
       }
       
-      newCompanyLists[index][actualDomain] = companies.filter(c => typeof c === 'string' && c.trim().length > 0);
+      newCompanyLists[paramIndex][actualDomain] = companies.filter(c => typeof c === 'string' && c.trim().length > 0);
     });
     
     setCompanyLists(prev => {
