@@ -145,6 +145,7 @@ const resultsCache = new Map()
 
 // in-memory cache ל-MVP - התוצאה האחרונה
 let latestNormalized = null
+let latestCompanyLists = null
 
 // Helper for debugging
 app.get("/api/debug/routes", (_, res) => {
@@ -428,6 +429,12 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
     }
   }
 
+  // Process company lists if present
+  if (body.companyLists && Array.isArray(body.companyLists)) {
+    console.log("Processing company lists:", body.companyLists.length, "items")
+    latestCompanyLists = body.companyLists
+  }
+
   console.log("Data saved successfully")
 
   // שמירה גם ב-cache הישן למען תאימות לאחור
@@ -449,15 +456,26 @@ app.get("/api/results/latest", (_, res) => {
     return res.status(404).json({ error: "no_data" })
   }
   
+  // Include company lists in the response if available
+  const response = {
+    ...latestNormalized
+  }
+  
+  if (latestCompanyLists) {
+    response.companyLists = latestCompanyLists
+    console.log("Including company lists in response:", latestCompanyLists.length, "items")
+  }
+  
   console.log("Returning latestNormalized:", {
     hasMatrix: !!latestNormalized.matrix,
     matrixLength: latestNormalized.matrix?.length,
     hasDomainKeys: !!latestNormalized.domainKeys,
     domainKeysLength: latestNormalized.domainKeys?.length,
-    paramCount: latestNormalized.paramCount
+    paramCount: latestNormalized.paramCount,
+    hasCompanyLists: !!latestCompanyLists
   })
   
-  res.json(latestNormalized)
+  res.json(response)
 })
 
 // GET /api/results/:runId - get results for a specific run
