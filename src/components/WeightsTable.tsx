@@ -1279,15 +1279,37 @@ Best regards`);
   };
 
   const processCompanyLists = (companyListsData: any) => {
-    const entries = Array.isArray(companyListsData)
-      ? companyListsData
-      : companyListsData && Array.isArray(companyListsData.companyLists)
-        ? companyListsData.companyLists.map((list: any) => ({
+    let entries: any[] = []
+    
+    // New format: object with parameter keys (e.g., { "5": {...}, "6": {...} })
+    if (typeof companyListsData === 'object' && !Array.isArray(companyListsData)) {
+      Object.entries(companyListsData).forEach(([paramKey, paramData]: [string, any]) => {
+        if (!paramData || typeof paramData !== 'object') return
+        const lists = paramData.lists || []
+        if (!Array.isArray(lists)) return
+        
+        // Add parameter info to each list entry
+        lists.forEach((list: any) => {
+          entries.push({
             ...list,
-            parameter: companyListsData.parameter,
-            domain_keys: companyListsData.domain_keys
-          }))
-        : []
+            parameter: Number(paramKey),
+            domain_keys: paramData.domain_keys
+          })
+        })
+      })
+    }
+    // Old format: array
+    else if (Array.isArray(companyListsData)) {
+      entries = companyListsData
+    }
+    // Alternative format: object with companyLists array
+    else if (companyListsData && Array.isArray(companyListsData.companyLists)) {
+      entries = companyListsData.companyLists.map((list: any) => ({
+        ...list,
+        parameter: companyListsData.parameter,
+        domain_keys: companyListsData.domain_keys
+      }))
+    }
 
     if (entries.length === 0) return
 
