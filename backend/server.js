@@ -363,13 +363,17 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
     }
   }
   // פורמט 4: נשלחו רק companyLists (כמערך של אובייקטים עם { parameter, companyLists })
-  else if (Array.isArray(body) && body.length > 0 && body[0] && body[0].companyLists) {
+  else if (
+    (Array.isArray(body) && body.length > 0 && body[0] && body[0].companyLists) ||
+    (!Array.isArray(body) && body && Array.isArray(body.companyLists))
+  ) {
     console.log("Detected companyLists-only payload, merging lists")
     if (!latestCompanyLists) latestCompanyLists = []
-    body.forEach(item => {
-      const param = item.parameter
+    const items = Array.isArray(body) ? body : [body]
+    items.forEach(item => {
+      const param = Number(item.parameter)
       const lists = item.companyLists
-      if (!Array.isArray(lists)) return
+      if (!Array.isArray(lists) || Number.isNaN(param)) return
       lists.forEach(list => {
         const entry = { parameter: param, ...list }
         const idx = latestCompanyLists.findIndex(e => e.parameter === entry.parameter && e.index === entry.index)
@@ -464,16 +468,19 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
     
     // Add new company lists, avoiding duplicates
     body.companyLists.forEach(newItem => {
+      const param = Number(newItem.parameter ?? body.parameter)
+      if (Number.isNaN(param)) return
+      const entry = { ...newItem, parameter: param }
       const existingIndex = latestCompanyLists.findIndex(
-        item => item.parameter === newItem.parameter && item.index === newItem.index
+        item => item.parameter === entry.parameter && item.index === entry.index
       )
       
       if (existingIndex !== -1) {
         // Update existing entry
-        latestCompanyLists[existingIndex] = newItem
+        latestCompanyLists[existingIndex] = entry
       } else {
         // Add new entry
-        latestCompanyLists.push(newItem)
+        latestCompanyLists.push(entry)
       }
     })
     

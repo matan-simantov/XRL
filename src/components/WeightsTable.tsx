@@ -1446,9 +1446,8 @@ Best regards`);
   }
 
   const RESULT_PARAMETER_INDEX_MAP: Record<number, number> = {
-    ...(ACTIVE_COMPANIES_WORLDWIDE_INDEX !== -1 ? { 14: ACTIVE_COMPANIES_WORLDWIDE_INDEX } : {}),
-    ...(ACTIVE_COMPANIES_ISRAEL_INDEX !== -1 ? { 15: ACTIVE_COMPANIES_ISRAEL_INDEX } : {}),
-    ...(EMPLOYEES_PARAM_INDEX !== -1 ? { 16: EMPLOYEES_PARAM_INDEX } : {}),
+    ...(ACTIVE_COMPANIES_ISRAEL_INDEX !== -1 ? { 14: ACTIVE_COMPANIES_ISRAEL_INDEX } : {}),
+    ...(EMPLOYEES_PARAM_INDEX !== -1 ? { 15: EMPLOYEES_PARAM_INDEX } : {}),
   }
 
   const RESULT_PARAMETER_SOURCES: Record<number, string> = (() => {
@@ -1607,82 +1606,20 @@ Best regards`);
   const applyFallbacksToResults = (
     data: Record<string, Record<number, number>>
   ): Record<string, Record<number, number>> => {
-    const paramStats: Record<number, NumberStats> = {};
-    const domainFormatStats: Record<string, Record<string, NumberStats>> = {};
-    const overallFormatStats: Record<string, NumberStats> = {};
+    const sanitized: Record<string, Record<number, number>> = {};
 
     Object.entries(data).forEach(([domain, values]) => {
-      if (!domainFormatStats[domain]) {
-        domainFormatStats[domain] = {};
-      }
+      sanitized[domain] = {};
       Object.entries(values).forEach(([paramIndexStr, rawValue]) => {
         const paramIndex = Number(paramIndexStr);
         const numericValue = typeof rawValue === "number" ? rawValue : Number(rawValue);
-        if (!Number.isFinite(numericValue) || numericValue <= 0) {
-          return;
+        if (Number.isFinite(numericValue)) {
+          sanitized[domain][paramIndex] = numericValue;
         }
-        addToNumberStats(paramStats, paramIndex, numericValue);
-        const formatKey = getFormatKey(paramIndex);
-        addToStringStats(domainFormatStats[domain], formatKey, numericValue);
-        addToStringStats(overallFormatStats, formatKey, numericValue);
       });
     });
 
-    const updatedData: Record<string, Record<number, number>> = {};
-    Object.entries(data).forEach(([domain, values]) => {
-      updatedData[domain] = { ...values };
-    });
-
-    Object.entries(updatedData).forEach(([domain, values]) => {
-      if (!domainFormatStats[domain]) {
-        domainFormatStats[domain] = {};
-      }
-
-      RESULTS_ACTIVE_PARAMETER_INDICES.forEach((paramIndex) => {
-        // אל תייצר ערך דמה לפרמטר Employees in Sector (יש להציג רק מה שמגיע מ-n8n)
-        if (paramIndex === EMPLOYEES_PARAM_INDEX) {
-          return;
-        }
-        const currentValue = values[paramIndex];
-        const numericValue = typeof currentValue === "number" ? currentValue : Number(currentValue);
-        if (Number.isFinite(numericValue) && numericValue > 0) {
-          return;
-        }
-
-        const fallback = generateFallbackValue(
-          paramIndex,
-          domain,
-          updatedData,
-          paramStats,
-          domainFormatStats,
-          overallFormatStats
-        );
-
-        if (fallback === undefined || !Number.isFinite(fallback) || fallback <= 0) {
-          return;
-        }
-
-        let normalizedValue = fallback;
-        const formatType = parameters[paramIndex]?.format;
-        if (formatType === "count") {
-          normalizedValue = Math.round(fallback);
-        } else if (formatType === "percentage") {
-          normalizedValue = parseFloat(fallback.toFixed(4));
-        } else if (formatType === "currency") {
-          normalizedValue = parseFloat(fallback.toFixed(2));
-        } else {
-          normalizedValue = parseFloat(fallback.toFixed(2));
-        }
-
-        values[paramIndex] = normalizedValue;
-        addToNumberStats(paramStats, paramIndex, normalizedValue);
-        const formatKey = getFormatKey(paramIndex);
-        addToStringStats(domainFormatStats[domain], formatKey, normalizedValue);
-        addToStringStats(overallFormatStats, formatKey, normalizedValue);
-      });
-    });
-
-    return updatedData;
+    return sanitized;
   };
 
   return (
