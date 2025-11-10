@@ -100,19 +100,19 @@ export function SecondaryCategorySelector({
 
       {value.length > 0 && (
         <div className="flex flex-wrap gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
-          {value.map((category) => (
+        {value.map((category) => (
             <span key={category} className="inline-flex items-center gap-1 px-3 py-1 bg-white border border-blue-200 rounded-full text-sm font-medium text-blue-900 shadow-sm hover:shadow-md transition-shadow">
-              {category}
-              <button
-                onClick={() => removeCategory(category)}
+            {category}
+            <button
+              onClick={() => removeCategory(category)}
                 className="ml-1 hover:text-red-600 transition-colors"
-                aria-label={`Remove ${category}`}
-              >
-                <X className="h-3 w-3" />
-              </button>
+              aria-label={`Remove ${category}`}
+            >
+              <X className="h-3 w-3" />
+            </button>
             </span>
           ))}
-        </div>
+      </div>
       )}
 
       <div className="grid grid-cols-2 gap-3 max-h-[350px] overflow-y-auto pr-2">
@@ -125,20 +125,20 @@ export function SecondaryCategorySelector({
               className={`domain-option ${isSelected ? 'selected' : ''} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
               onClick={() => !isDisabled && toggleCategory(category)}
             >
-              <Checkbox
-                id={category}
+            <Checkbox
+              id={category}
                 checked={isSelected}
                 onCheckedChange={() => !isDisabled && toggleCategory(category)}
                 disabled={isDisabled}
                 className="pointer-events-none"
-              />
-              <Label
-                htmlFor={category}
+            />
+            <Label
+              htmlFor={category}
                 className="text-[#111111] font-normal cursor-pointer flex-1 ml-2 pointer-events-none"
-              >
-                {category}
-              </Label>
-            </div>
+            >
+              {category}
+            </Label>
+          </div>
           );
         })}
       </div>
