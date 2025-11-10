@@ -170,10 +170,9 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
   console.log("Body keys:", body ? Object.keys(body) : "null/undefined")
   console.log("Body sample:", JSON.stringify(body, null, 2).substring(0, 500))
 
-  // אם הגוף הוא מערך, קח את האובייקט הראשון
-  if (Array.isArray(body) && body.length > 0) {
-    console.log("Body is an array, extracting first element")
-    body = body[0]
+  // אם הגוף הוא מערך - נשאיר אותו כך ונזהה את הפורמט בהמשך
+  if (Array.isArray(body)) {
+    console.log("Body is an array with", body.length, "items")
   }
 
   // בדיקה אם body ריק או לא תקין
@@ -192,14 +191,14 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
   let meta = body.meta || {}
 
   // פורמט 1: { matrix: [[...]], domain_keys: [...], param_count: number }
-  if (Array.isArray(body.matrix) && Array.isArray(body.domain_keys)) {
-    matrix = body.matrix
+  if (!Array.isArray(body) && Array.isArray(body.matrix) && Array.isArray(body.domain_keys)) {
+    matrix = body.matrix.map(row => Array.isArray(row) ? row.map(v => v === null ? null : Number(v)) : [])
     domainKeys = body.domain_keys
     paramCount = body.param_count || matrix.length
     console.log("Detected format: direct matrix array")
   }
   // פורמט 2: { matrix: { domain_keys: {...}, param_count: number, values: {...} } }
-  else if (body.matrix && typeof body.matrix === "object" && body.matrix.domain_keys) {
+  else if (!Array.isArray(body) && body.matrix && typeof body.matrix === "object" && body.matrix.domain_keys) {
     const matrixObj = body.matrix
     
     // domain_keys יכול להיות object {0:1, 1:2, ...} או array
@@ -218,7 +217,7 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
     
     if (Array.isArray(values)) {
       // אם values הוא array, זה כבר מטריצה!
-      matrix = values
+      matrix = values.map(row => Array.isArray(row) ? row.map(v => v === null ? null : Number(v)) : [])
       console.log("Detected format: matrix object with values array")
     } else if (typeof values === "object") {
       // המרה מ-values object למטריצה
@@ -264,7 +263,7 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
     })
   }
   // פורמט 3: entries array (הישן או החדש עם index/parameter/value)
-  else if (Array.isArray(body.entries) || Array.isArray(body)) {
+  else if ((!Array.isArray(body) && Array.isArray(body.entries)) || (Array.isArray(body) && body.length > 0 && body[0] && body[0].hasOwnProperty('parameter') && body[0].hasOwnProperty('index') && body[0].hasOwnProperty('value'))) {
     const entries = Array.isArray(body) ? body : body.entries
     console.log("Detected format: entries array, converting to matrix")
     
@@ -362,6 +361,24 @@ app.post("/api/n8n/callback", cors(), (req, res) => {
         }
       })
     }
+  }
+  // פורמט 4: נשלחו רק companyLists (כמערך של אובייקטים עם { parameter, companyLists })
+  else if (Array.isArray(body) && body.length > 0 && body[0] && body[0].companyLists) {
+    console.log("Detected companyLists-only payload, merging lists")
+    if (!latestCompanyLists) latestCompanyLists = []
+    body.forEach(item => {
+      const param = item.parameter
+      const lists = item.companyLists
+      if (!Array.isArray(lists)) return
+      lists.forEach(list => {
+        const entry = { parameter: param, ...list }
+        const idx = latestCompanyLists.findIndex(e => e.parameter === entry.parameter && e.index === entry.index)
+        if (idx !== -1) latestCompanyLists[idx] = entry
+        else latestCompanyLists.push(entry)
+      })
+    })
+    console.log("Company lists merged, count:", latestCompanyLists.length)
+    return res.json({ ok: true, receivedCompanyLists: latestCompanyLists.length })
   }
   else {
     return res.status(400).json({ 
