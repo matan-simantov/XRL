@@ -238,13 +238,17 @@ const generateIIADefaultWeights = (): Record<number, number> => {
     }
   });
   
-  // Ensure sum is exactly 100
+  // Ensure sum is exactly 100 by adjusting the last non-null parameter
   const total = Object.values(weights).reduce((sum, w) => sum + w, 0);
   if (Math.abs(total - 100) > 0.05) {
     const diff = 100 - total;
-    const lastParamIndex = parameters.length - 1;
-    const newValue = (weights[lastParamIndex] || 0) + diff;
-    weights[lastParamIndex] = Math.max(0, parseFloat(newValue.toFixed(1))); // Ensure no negative and 1 decimal
+    // Find the last parameter that has a weight
+    const paramIndices = Object.keys(weights).map(k => parseInt(k)).sort((a, b) => b - a);
+    if (paramIndices.length > 0) {
+      const lastParamIndex = paramIndices[0];
+      const newValue = (weights[lastParamIndex] || 0) + diff;
+      weights[lastParamIndex] = Math.max(0, parseFloat(newValue.toFixed(1)));
+    }
   }
   
   // Final pass: ensure all values have exactly 1 decimal place and no negatives
@@ -1325,11 +1329,10 @@ Best regards`);
           : Number(paramNumberRaw)
       if (!Number.isFinite(paramNumber)) return
 
-      const matrixIndex = paramNumber - 1
-      if (!Number.isFinite(matrixIndex) || matrixIndex < 0) return
-
-      const actualParamIndex =
-        RESULT_PARAMETER_INDEX_MAP[matrixIndex] ?? matrixIndex
+      // For company lists, paramNumber is the actual frontend parameter index (5 for Series A, 6 for Series B-C)
+      // No need to use RESULT_PARAMETER_INDEX_MAP here
+      const actualParamIndex = paramNumber
+      console.log(`Processing company list: paramNumber=${paramNumber}, actualParamIndex=${actualParamIndex}, paramName=${parameters[actualParamIndex]?.short}`)
       if (!parameters[actualParamIndex]) return
 
       const rawCompanies = Array.isArray(item.companies) ? item.companies : []
@@ -1372,6 +1375,7 @@ Best regards`);
       }
 
       newCompanyLists[actualParamIndex][domainName] = cleanedCompanies
+      console.log(`Stored companies for param ${actualParamIndex} (${parameters[actualParamIndex]?.short}), domain "${domainName}": ${cleanedCompanies.length} companies`)
     })
 
     if (Object.keys(newCompanyLists).length === 0) return
@@ -1386,8 +1390,10 @@ Best regards`);
         }
         Object.entries(domainMap).forEach(([domainName, companies]) => {
           merged[paramIndex][domainName] = companies
+          console.log(`Final merge: param ${paramIndex} (${parameters[paramIndex]?.short}), domain "${domainName}": ${companies.length} companies`)
         })
       })
+      console.log("Final companyLists state:", merged)
       return merged
     })
   }
