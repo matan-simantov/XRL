@@ -1,4 +1,4 @@
-import { FileText, History, Settings, LogOut } from "lucide-react";
+import { FileText, History, Settings, LogOut, BarChart3 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Sidebar,
@@ -13,6 +13,7 @@ import {
 
 const menuItems = [
   { title: "📝 New Assessment", url: "/dashboard/new-form", icon: FileText },
+  { title: "📊 Researcher Dashboard", url: "/researcher", icon: BarChart3 },
   { title: "🕓 History", url: "/dashboard/history", icon: History },
   { title: "⚙️ Settings", url: "/dashboard/settings", icon: Settings },
 ];

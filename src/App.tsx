@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import NewForm from "./pages/NewForm";
 import History from "./pages/History";
 import Settings from "./pages/Settings";
+import ResearcherHome from "./pages/ResearcherHome";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -58,6 +59,7 @@ const App = () => {
               <Route path="settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             </Route>
             <Route path="/results" element={<ProtectedRoute><div className="p-6"><h1 className="text-2xl mb-4">XRL Results</h1><DomainResultsTable domains={[]} /></div></ProtectedRoute>} />
+            <Route path="/researcher" element={<ProtectedRoute><ResearcherHome /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -3,7 +3,7 @@ import { DashboardSidebar } from "@/components/DashboardSidebar";
 import { Outlet, useLocation, Link, useNavigate } from "react-router-dom";
 import { Card, CardDescription, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, History, ArrowRight, Calendar, Clock } from "lucide-react";
+import { FileText, History, ArrowRight, Calendar, Clock, BarChart3 } from "lucide-react";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import { useButtonColor } from "@/hooks/use-button-color";
@@ -85,7 +85,7 @@ const Dashboard = () => {
               <div className="space-y-4">
                 {userName && (
                   <h1 className="text-4xl font-bold text-foreground">
-                    Hey {userName}! 👋
+                    Hey {userName}!! 👋
                   </h1>
                 )}
                 <div className="space-y-2">
@@ -98,16 +98,28 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* New Form Button */}
-              <Button
-                onClick={handleNewForm}
-                size="lg"
-                className={`${getButtonClasses()} text-lg px-8 py-6 h-auto`}
-              >
-                <FileText className="mr-2 h-5 w-5" />
-                Create New Assessment
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Button
+                  onClick={handleNewForm}
+                  size="lg"
+                  className={`${getButtonClasses()} text-lg px-8 py-6 h-auto`}
+                >
+                  <FileText className="mr-2 h-5 w-5" />
+                  Create New Assessment
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+                <Button
+                  onClick={() => navigate("/researcher")}
+                  size="lg"
+                  variant="outline"
+                  className="text-lg px-8 py-6 h-auto"
+                >
+                  <BarChart3 className="mr-2 h-5 w-5" />
+                  Researcher Dashboard
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </div>
 
               {/* Drafts Section */}
               {drafts.length > 0 && (

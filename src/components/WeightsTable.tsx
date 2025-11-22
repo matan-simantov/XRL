@@ -1,7 +1,8 @@
 import { useState, useEffect, Fragment } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { X, Mail, ChevronLeft, ChevronRight, RefreshCw, Eye, EyeOff, FileText, CheckCircle, MoreVertical, HelpCircle, ChevronDown, ChevronUp, Info, Building2 } from "lucide-react";
+import { X, Mail, ChevronLeft, ChevronRight, RefreshCw, Eye, EyeOff, FileText, CheckCircle, MoreVertical, HelpCircle, ChevronDown, ChevronUp, Info, Building2, BarChart3 } from "lucide-react";
+import { ReadinessDashboardModal } from "@/components/ReadinessDashboardModal";
 import {
   Tooltip,
   TooltipContent,
@@ -376,6 +377,9 @@ export const WeightsTable = ({ llms = [], participants = [], domains = [], initi
   
   // Results comparison table
   const [showResultsTable, setShowResultsTable] = useState(false);
+  
+  // Readiness dashboard modal
+  const [showReadinessDashboard, setShowReadinessDashboard] = useState(false);
   const [resultData, setResultData] = useState<Record<string, Record<number, number>>>({});
   // Always start with weights view when opening from History
   const [viewMode, setViewMode] = useState<'weights' | 'results'>('weights');
@@ -1773,6 +1777,16 @@ Best regards`);
                   >
                     Results
                   </Button>
+                  {viewMode === 'results' && (
+                    <Button 
+                      onClick={() => setShowReadinessDashboard(true)}
+                      className={getButtonClasses()}
+                      size="sm"
+                    >
+                      <BarChart3 className="h-4 w-4 mr-1" />
+                      Readiness
+                    </Button>
+                  )}
                 </div>
               )}
               {!showResultsTable && (
@@ -2639,6 +2653,12 @@ Best regards`);
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Readiness Dashboard Modal */}
+      <ReadinessDashboardModal
+        open={showReadinessDashboard}
+        onOpenChange={setShowReadinessDashboard}
+      />
 
     </>
   );
